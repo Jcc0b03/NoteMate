@@ -1,0 +1,387 @@
+"use client";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { useRouter } from "next/navigation";
+import QRCode from "react-qr-code";
+import { useDropzone } from "react-dropzone";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+
+const frameworks = [
+    {
+        value: "math",
+        label: "Matematyka",
+    },
+    {
+        value: "physics",
+        label: "Fizyka",
+    },
+    {
+        value: "history",
+        label: "Historia",
+    },
+    {
+        value: "biology",
+        label: "Biologia",
+    },
+];
+
+export default function NewNotePage() {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [value, setValue] = useState("");
+    const [subjects, setSubjects] = useState(frameworks);
+    const [inputValue, setInputValue] = useState("");
+    const [qrOpen, setQrOpen] = useState(false);
+
+    const [files, setFiles] = useState<Array<{ name: string; size: number; progress: number; status: 'uploading' | 'complete' | 'error' }>>([]);
+    const [tags, setTags] = useState<string[]>(["Ważne", "Egzamin"]);
+    const [tagInput, setTagInput] = useState("");
+
+    const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && tagInput.trim()) {
+            e.preventDefault();
+            if (!tags.includes(tagInput.trim())) {
+                setTags([...tags, tagInput.trim()]);
+            }
+            setTagInput("");
+        }
+    };
+
+    const removeTag = (tagToRemove: string) => {
+        setTags(tags.filter(tag => tag !== tagToRemove));
+    };
+
+    const onDrop = (acceptedFiles: File[]) => {
+        const newFiles = acceptedFiles.map(file => ({
+            name: file.name,
+            size: file.size,
+            progress: 0,
+            status: 'uploading' as const
+        }));
+
+        setFiles(prev => [...prev, ...newFiles]);
+
+        // Simulate upload progress
+        newFiles.forEach((file, index) => {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                setFiles(prev => prev.map(f => {
+                    if (f.name === file.name) {
+                        return { ...f, progress: Math.min(progress, 100), status: progress >= 100 ? 'complete' : 'uploading' };
+                    }
+                    return f;
+                }));
+                if (progress >= 100) clearInterval(interval);
+            }, 500);
+        });
+    };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+    const removeFile = (fileName: string) => {
+        setFiles(files.filter(f => f.name !== fileName));
+    };
+
+    const handleCreateSubject = () => {
+        if (!inputValue) return;
+        const newSubject = { value: inputValue.toLowerCase(), label: inputValue };
+        setSubjects([...subjects, newSubject]);
+        setValue(newSubject.value);
+        setOpen(false);
+    };
+
+    return (
+        <>
+            <div className="flex-1 p-6 md:p-8 overflow-y-auto">
+                <div className="max-w-6xl mx-auto space-y-8">
+                    {/* Header */}
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => router.back()}
+                            className="p-2 -ml-2 hover:bg-muted/50 rounded-full transition-colors"
+                        >
+                            <ArrowLeft className="size-6 text-muted-foreground" />
+                        </button>
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight">Dodaj nową notatkę</h1>
+                            <p className="text-muted-foreground">Prześlij materiały, a my zajmiemy się resztą.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                        {/* Left Column - Form Card */}
+                        <div className="lg:col-span-1 bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="title" className="font-semibold">Tytuł notatki</Label>
+                                <Input id="title" placeholder="np. Wykład z algebry" className="bg-muted/50" />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="font-semibold">Przedmiot</Label>
+                                <Popover open={open} onOpenChange={setOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={open}
+                                            className="w-full justify-between bg-muted/50 font-normal hover:bg-muted/70"
+                                        >
+                                            {value
+                                                ? subjects.find((subject) => subject.value === value)?.label
+                                                : "Wybierz przedmiot..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[300px] p-0" align="start">
+                                        <Command>
+                                            <CommandInput
+                                                placeholder="Szukaj przedmiotu..."
+                                                onValueChange={setInputValue}
+                                            />
+                                            <CommandList>
+                                                <CommandEmpty className="py-2 px-2">
+                                                    <p className="text-sm text-muted-foreground mb-2 px-2">Nie znaleziono przedmiotu.</p>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full justify-start gap-2"
+                                                        onClick={handleCreateSubject}
+                                                    >
+                                                        <Plus className="h-4 w-4" />
+                                                        Dodaj "{inputValue}"
+                                                    </Button>
+                                                </CommandEmpty>
+                                                <CommandGroup>
+                                                    {subjects.map((subject) => (
+                                                        <CommandItem
+                                                            key={subject.value}
+                                                            value={subject.value}
+                                                            onSelect={(currentValue) => {
+                                                                setValue(currentValue === value ? "" : currentValue);
+                                                                setOpen(false);
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    value === subject.value ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {subject.label}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="font-semibold">Tagi</Label>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {tags.map((tag, index) => (
+                                        <div
+                                            key={tag}
+                                            className={cn(
+                                                "text-xs font-medium px-2.5 py-1 rounded-md flex items-center gap-1",
+                                                index % 2 === 0
+                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                            )}
+                                        >
+                                            # {tag}
+                                            <button
+                                                onClick={() => removeTag(tag)}
+                                                className={cn(
+                                                    "hover:opacity-75 transition-opacity",
+                                                    index % 2 === 0 ? "hover:text-blue-900" : "hover:text-green-900"
+                                                )}
+                                            >
+                                                <X className="size-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Input
+                                    placeholder="Dodaj tag i naciśnij Enter..."
+                                    className="bg-muted/50"
+                                    value={tagInput}
+                                    onChange={(e) => setTagInput(e.target.value)}
+                                    onKeyDown={handleAddTag}
+                                />
+                            </div>
+
+                            <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 rounded-xl p-4 flex gap-3">
+                                <Sparkles className="size-5 text-blue-500 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400">Wskazówka AI</h4>
+                                    <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
+                                        Notemate automatycznie wykryje daty i definicje z Twoich notatek, aby utworzyć fiszki do nauki.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Upload Card */}
+                        <div className="lg:col-span-2 bg-card border border-border rounded-3xl p-6 shadow-sm h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="space-y-0.5">
+                                    <h3 className="font-semibold">Pliki</h3>
+                                    <p className="text-xs text-muted-foreground">Prześlij zdjęcia lub skany notatek</p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-2 text-xs"
+                                    onClick={() => setQrOpen(true)}
+                                >
+                                    <Smartphone className="size-3.5" />
+                                    Prześlij z telefonu
+                                </Button>
+                            </div>
+
+                            {/* Dropzone */}
+                            <div
+                                {...getRootProps()}
+                                className={cn(
+                                    "border-2 border-dashed rounded-xl h-64 flex flex-col items-center justify-center text-center gap-4 transition-all cursor-pointer mb-6",
+                                    isDragActive
+                                        ? "border-primary bg-primary/5"
+                                        : "border-primary/20 bg-blue-50/30 dark:bg-blue-900/5 hover:border-primary/40 hover:bg-blue-50/50"
+                                )}
+                            >
+                                <input {...getInputProps()} />
+                                <div className="size-14 rounded-full bg-white dark:bg-card shadow-sm flex items-center justify-center text-primary">
+                                    <Upload className="size-7" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="font-semibold text-base">
+                                        {isDragActive ? "Upuść pliki tutaj..." : "Upuść notatki tutaj"}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">lub kliknij, aby przeglądać pliki</p>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                    <span className="flex items-center gap-1.5"><FileText className="size-3.5" /> JPG, PNG</span>
+                                    <span className="flex items-center gap-1.5"><FileText className="size-3.5" /> PDF</span>
+                                    <span>MAX 10 MB</span>
+                                </div>
+                            </div>
+
+                            {/* File List */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Przesyłanie ({files.length})
+                                </h4>
+
+                                {files.map((file) => (
+                                    <div key={file.name} className="bg-white dark:bg-muted/30 border border-border/50 rounded-xl p-4 flex items-center gap-4">
+                                        <div className={cn(
+                                            "size-12 rounded-xl flex items-center justify-center shrink-0",
+                                            file.status === 'complete' ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
+                                        )}>
+                                            {file.name.endsWith('.pdf') ? <FileText className="size-6" /> : <ImageIcon className="size-6" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <p className="text-sm font-semibold truncate">{file.name}</p>
+                                                <div className={cn(
+                                                    "flex items-center gap-1.5 text-xs font-bold",
+                                                    file.status === 'complete' ? "text-green-600" : "text-blue-600"
+                                                )}>
+                                                    {file.status === 'complete' ? (
+                                                        <>
+                                                            <Check className="size-3.5" />
+                                                            Gotowe
+                                                        </>
+                                                    ) : (
+                                                        "Wysyłanie..."
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <Progress
+                                                    value={file.progress}
+                                                    className={cn(
+                                                        "h-1.5",
+                                                        file.status === 'complete' ? "bg-green-100 [&>div]:bg-green-500" : "bg-blue-100 [&>div]:bg-blue-500"
+                                                    )}
+                                                />
+                                                <span className="text-xs text-muted-foreground tabular-nums font-medium">{file.progress}%</span>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
+                                                <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => removeFile(file.name)}
+                                            className="text-muted-foreground hover:text-destructive transition-colors p-2 hover:bg-muted rounded-lg"
+                                        >
+                                            <Trash2 className="size-4.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer Buttons */}
+                    <div className="flex items-center justify-end gap-4 pt-4">
+                        <Button variant="ghost" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+                            Anuluj
+                        </Button>
+                        <Button className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11">
+                            <Sparkles className="size-4" />
+                            Przetwórz i Zapisz
+                        </Button>
+                    </div>
+                </div>
+
+                <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Prześlij z telefonu</DialogTitle>
+                            <DialogDescription>
+                                Zeskanuj kod QR swoim telefonem, aby szybko przesłać zdjęcia notatek.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center justify-center p-6 space-y-6">
+                            <div className="bg-white p-4 rounded-xl border shadow-sm">
+                                <QRCode value="https://notemate.app/upload/123" size={200} />
+                            </div>
+                            <p className="text-sm text-center text-muted-foreground max-w-[260px]">
+                                Upewnij się, że oba urządzenia są podłączone do Internetu.
+                            </p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </>
+    );
+}
