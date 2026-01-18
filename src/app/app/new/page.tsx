@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown, ArrowLeft, AlertCircle } from "lucide-react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
     Command,
@@ -30,6 +30,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { upload } from "@vercel/blob/client";
 
 const frameworks = [
     {
@@ -50,6 +51,17 @@ const frameworks = [
     },
 ];
 
+type FileUploadStatus = 'uploading' | 'complete' | 'error';
+
+interface FileUpload {
+    id: string;
+    file: File;
+    progress: number;
+    status: FileUploadStatus;
+    url?: string;
+    error?: string;
+}
+
 export default function NewNotePage() {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -58,7 +70,7 @@ export default function NewNotePage() {
     const [inputValue, setInputValue] = useState("");
     const [qrOpen, setQrOpen] = useState(false);
 
-    const [files, setFiles] = useState<Array<{ name: string; size: number; progress: number; status: 'uploading' | 'complete' | 'error' }>>([]);
+    const [files, setFiles] = useState<FileUpload[]>([]);
     const [tags, setTags] = useState<string[]>(["Ważne", "Egzamin"]);
     const [tagInput, setTagInput] = useState("");
 
@@ -76,36 +88,60 @@ export default function NewNotePage() {
         setTags(tags.filter(tag => tag !== tagToRemove));
     };
 
-    const onDrop = (acceptedFiles: File[]) => {
-        const newFiles = acceptedFiles.map(file => ({
-            name: file.name,
-            size: file.size,
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        const newFiles: FileUpload[] = acceptedFiles.map(file => ({
+            id: Math.random().toString(36).substring(7),
+            file,
             progress: 0,
-            status: 'uploading' as const
+            status: 'uploading'
         }));
 
         setFiles(prev => [...prev, ...newFiles]);
 
-        // Simulate upload progress
-        newFiles.forEach((file, index) => {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 10;
+        for (const fileUpload of newFiles) {
+            try {
+                const blob = await upload(fileUpload.file.name, fileUpload.file, {
+                    access: 'public',
+                    handleUploadUrl: '/api/upload',
+                    onUploadProgress: (progressEvent) => {
+                         setFiles(prev => prev.map(f => {
+                             if (f.id === fileUpload.id) {
+                                 return { ...f, progress: progressEvent.percentage };
+                             }
+                             return f;
+                         }));
+                    }
+                });
+
                 setFiles(prev => prev.map(f => {
-                    if (f.name === file.name) {
-                        return { ...f, progress: Math.min(progress, 100), status: progress >= 100 ? 'complete' : 'uploading' };
+                    if (f.id === fileUpload.id) {
+                        return { ...f, status: 'complete', url: blob.url, progress: 100 };
                     }
                     return f;
                 }));
-                if (progress >= 100) clearInterval(interval);
-            }, 500);
-        });
-    };
+            } catch (error) {
+                console.error("Upload error:", error);
+                 setFiles(prev => prev.map(f => {
+                    if (f.id === fileUpload.id) {
+                        return { ...f, status: 'error', error: 'Upload failed' };
+                    }
+                    return f;
+                }));
+            }
+        }
+    }, []);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+            'application/pdf': ['.pdf']
+        },
+        maxSize: 10 * 1024 * 1024 // 10MB
+    });
 
-    const removeFile = (fileName: string) => {
-        setFiles(files.filter(f => f.name !== fileName));
+    const removeFile = (id: string) => {
+        setFiles(files.filter(f => f.id !== id));
     };
 
     const handleCreateSubject = () => {
@@ -295,59 +331,71 @@ export default function NewNotePage() {
                             </div>
 
                             {/* File List */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                    Przesyłanie ({files.length})
-                                </h4>
+                            {files.length > 0 && (
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        Przesyłanie ({files.length})
+                                    </h4>
 
-                                {files.map((file) => (
-                                    <div key={file.name} className="bg-white dark:bg-muted/30 border border-border/50 rounded-xl p-4 flex items-center gap-4">
-                                        <div className={cn(
-                                            "size-12 rounded-xl flex items-center justify-center shrink-0",
-                                            file.status === 'complete' ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-                                        )}>
-                                            {file.name.endsWith('.pdf') ? <FileText className="size-6" /> : <ImageIcon className="size-6" />}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <p className="text-sm font-semibold truncate">{file.name}</p>
-                                                <div className={cn(
-                                                    "flex items-center gap-1.5 text-xs font-bold",
-                                                    file.status === 'complete' ? "text-green-600" : "text-blue-600"
-                                                )}>
-                                                    {file.status === 'complete' ? (
-                                                        <>
-                                                            <Check className="size-3.5" />
-                                                            Gotowe
-                                                        </>
-                                                    ) : (
-                                                        "Wysyłanie..."
-                                                    )}
+                                    {files.map((file) => (
+                                        <div key={file.id} className="bg-white dark:bg-muted/30 border border-border/50 rounded-xl p-4 flex items-center gap-4">
+                                            <div className={cn(
+                                                "size-12 rounded-xl flex items-center justify-center shrink-0",
+                                                file.status === 'complete' ? "bg-green-100 text-green-600" :
+                                                file.status === 'error' ? "bg-red-100 text-red-600" :
+                                                "bg-blue-100 text-blue-600"
+                                            )}>
+                                                {file.status === 'error' ? <AlertCircle className="size-6" /> :
+                                                 file.file.name.endsWith('.pdf') ? <FileText className="size-6" /> : <ImageIcon className="size-6" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <p className="text-sm font-semibold truncate" title={file.file.name}>{file.file.name}</p>
+                                                    <div className={cn(
+                                                        "flex items-center gap-1.5 text-xs font-bold",
+                                                        file.status === 'complete' ? "text-green-600" :
+                                                        file.status === 'error' ? "text-red-600" :
+                                                        "text-blue-600"
+                                                    )}>
+                                                        {file.status === 'complete' ? (
+                                                            <>
+                                                                <Check className="size-3.5" />
+                                                                Gotowe
+                                                            </>
+                                                        ) : file.status === 'error' ? (
+                                                            "Błąd"
+                                                        ) : (
+                                                            "Wysyłanie..."
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {file.status !== 'error' && (
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <Progress
+                                                            value={file.progress}
+                                                            className={cn(
+                                                                "h-1.5",
+                                                                file.status === 'complete' ? "bg-green-100 [&>div]:bg-green-500" : "bg-blue-100 [&>div]:bg-blue-500"
+                                                            )}
+                                                        />
+                                                        <span className="text-xs text-muted-foreground tabular-nums font-medium">{Math.round(file.progress)}%</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
+                                                    <span>{(file.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                    {file.error && <span className="text-red-500 ml-2">{file.error}</span>}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <Progress
-                                                    value={file.progress}
-                                                    className={cn(
-                                                        "h-1.5",
-                                                        file.status === 'complete' ? "bg-green-100 [&>div]:bg-green-500" : "bg-blue-100 [&>div]:bg-blue-500"
-                                                    )}
-                                                />
-                                                <span className="text-xs text-muted-foreground tabular-nums font-medium">{file.progress}%</span>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
-                                                <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                                            </div>
+                                            <button
+                                                onClick={() => removeFile(file.id)}
+                                                className="text-muted-foreground hover:text-destructive transition-colors p-2 hover:bg-muted rounded-lg"
+                                            >
+                                                {file.status === 'uploading' ? <X className="size-4.5" /> : <Trash2 className="size-4.5" />}
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => removeFile(file.name)}
-                                            className="text-muted-foreground hover:text-destructive transition-colors p-2 hover:bg-muted rounded-lg"
-                                        >
-                                            <Trash2 className="size-4.5" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -356,7 +404,10 @@ export default function NewNotePage() {
                         <Button variant="ghost" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
                             Anuluj
                         </Button>
-                        <Button className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11">
+                        <Button
+                            className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11"
+                            disabled={files.some(f => f.status === 'uploading')}
+                        >
                             <Sparkles className="size-4" />
                             Przetwórz i Zapisz
                         </Button>
