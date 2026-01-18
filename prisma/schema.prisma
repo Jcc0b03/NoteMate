@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Note {
+  id          String      @id @default(cuid())
+  userId      String      // ID użytkownika z Clerk
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  imageUrl    String?     // URL do pliku w Vercel Blob (Main image/thumbnail)
+  title       String?     @default("Nowa notatka")
+  subject     String?
+  tags        String[]
+
+  // Dane wygenerowane przez AI
+  content     String?     @db.Text // Pełna transkrypcja (OCR)
+  summary     String?     @db.Text // Krótkie podsumowanie
+
+  // Status przetwarzania
+  status      NoteStatus  @default(PROCESSING)
+
+  // Relations
+  messages    Message[]
+  files       NoteFile[]
+}
+
+model NoteFile {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  type      String   // e.g., "image/png", "application/pdf"
+  size      Int      // File size in bytes
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  role      Role
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+enum NoteStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum Role {
+  user
+  assistant
+  system
+}
