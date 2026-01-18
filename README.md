@@ -36,6 +36,7 @@ Zestaw dobrany pod szybki development (Speedrun Edition) i darmowy hosting.
 ## 🎨 Design System
 
 Styl inspirowany aplikacjami takimi jak Duolingo – przyjazny, czysty i nowoczesny.
+[Zobacz inspirację projektu](https://stitch.withgoogle.com/projects/4976148389212435323)
 
 ### Paleta Kolorów
 | Rola | Kolor | Hex | Zastosowanie |
