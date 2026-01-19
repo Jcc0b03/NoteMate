@@ -5,9 +5,13 @@ import { NewNoteCard } from "@/components/NewNoteCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { currentUser } from "@clerk/nextjs/server";
+import { getRecentNotes, getDashboardStats } from "@/app/actions";
+import { formatRelativeTime, getColorForSubject } from "@/lib/utils";
 
 export default async function Dashboard() {
     const user = await currentUser();
+    const notes = await getRecentNotes();
+    const stats = await getDashboardStats();
 
     return (
         <div className="space-y-10">
@@ -15,10 +19,12 @@ export default async function Dashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-blue-950 dark:text-blue-50">
-                        Cześć, {user?.firstName || "Alex"}! 👋
+                        Cześć, {user?.firstName || "Użytkowniku"}! 👋
                     </h1>
                     <p className="text-muted-foreground mt-2 text-lg">
-                        Masz dzisiaj 3 notatki do powtórzenia.
+                        {notes.length > 0
+                            ? `Ostatnio pracowałeś nad: ${notes[0].title}.`
+                            : "Zacznij od dodania swojej pierwszej notatki."}
                     </p>
                 </div>
 
@@ -29,7 +35,7 @@ export default async function Dashboard() {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Dni z rzędu</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">12</span>
+                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{stats.streak}</span>
                         </div>
                     </div>
 
@@ -39,7 +45,7 @@ export default async function Dashboard() {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Ukończone</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">85%</span>
+                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{stats.completedPercentage}%</span>
                         </div>
                     </div>
                 </div>
@@ -74,27 +80,17 @@ export default async function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <NoteCard
-                        title="Całki Nieoznaczone"
-                        preview="Wprowadzenie do całek, podstawowe wzory i przykłady..."
-                        date="2 godz. temu"
-                        tag="Matematyka"
-                        color="blue"
-                    />
-                    <NoteCard
-                        title="Wojna Trzydziestoletnia"
-                        preview="Notatki z wykładu prof. Nowaka, przyczyny i skutki..."
-                        date="5 min temu"
-                        tag="Historia"
-                        color="orange"
-                    />
-                    <NoteCard
-                        title="Termodynamika - Wstęp"
-                        preview="Pierwsza zasada termodynamiki, układy otwarte i zamknięte."
-                        date="1 dzień temu"
-                        tag="Fizyka"
-                        color="green"
-                    />
+                    {notes.map((note) => (
+                        <Link href={`/app/notes/${note.id}`} key={note.id} className="h-full">
+                            <NoteCard
+                                title={note.title || "Bez tytułu"}
+                                preview={note.summary || note.content?.substring(0, 100) || "Brak treści"}
+                                date={formatRelativeTime(note.createdAt)}
+                                tag={note.subject?.name || "Ogólne"}
+                                color={getColorForSubject(note.subject?.name || null)}
+                            />
+                        </Link>
+                    ))}
                     <Link href="/app/new" className="h-full">
                         <NewNoteCard />
                     </Link>
@@ -147,7 +143,7 @@ export default async function Dashboard() {
 
             {/* Footer */}
             <footer className="py-8 text-center text-sm text-muted-foreground">
-                <p>© 2023 Notemate. Wszelkie prawa zastrzeżone.</p>
+                <p>© 2023 NoteMate. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex justify-center gap-4 mt-2">
                     <a href="#" className="hover:text-foreground">Prywatność</a>
                     <a href="#" className="hover:text-foreground">Regulamin</a>

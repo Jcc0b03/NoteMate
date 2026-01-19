@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import {
     Command,
@@ -30,37 +30,30 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
-
-const frameworks = [
-    {
-        value: "math",
-        label: "Matematyka",
-    },
-    {
-        value: "physics",
-        label: "Fizyka",
-    },
-    {
-        value: "history",
-        label: "Historia",
-    },
-    {
-        value: "biology",
-        label: "Biologia",
-    },
-];
+import { getSubjects, createSubject, createNote } from "@/app/actions";
 
 export default function NewNotePage() {
     const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+
+    // Form State
+    const [title, setTitle] = useState("");
     const [open, setOpen] = useState(false);
-    const [value, setValue] = useState("");
-    const [subjects, setSubjects] = useState(frameworks);
+    const [value, setValue] = useState(""); // Selected subject name
+    const [subjects, setSubjects] = useState<{label: string, value: string}[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [qrOpen, setQrOpen] = useState(false);
 
-    const [files, setFiles] = useState<Array<{ name: string; size: number; progress: number; status: 'uploading' | 'complete' | 'error' }>>([]);
+    const [files, setFiles] = useState<Array<{ name: string; size: number; type: string; progress: number; status: 'uploading' | 'complete' | 'error' }>>([]);
     const [tags, setTags] = useState<string[]>(["Ważne", "Egzamin"]);
     const [tagInput, setTagInput] = useState("");
+
+    // Load subjects
+    useEffect(() => {
+        getSubjects().then(data => {
+            setSubjects(data.map(s => ({ label: s.name, value: s.name })));
+        });
+    }, []);
 
     const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter" && tagInput.trim()) {
@@ -80,6 +73,7 @@ export default function NewNotePage() {
         const newFiles = acceptedFiles.map(file => ({
             name: file.name,
             size: file.size,
+            type: file.type,
             progress: 0,
             status: 'uploading' as const
         }));
@@ -87,7 +81,7 @@ export default function NewNotePage() {
         setFiles(prev => [...prev, ...newFiles]);
 
         // Simulate upload progress
-        newFiles.forEach((file, index) => {
+        newFiles.forEach((file) => {
             let progress = 0;
             const interval = setInterval(() => {
                 progress += 10;
@@ -98,7 +92,7 @@ export default function NewNotePage() {
                     return f;
                 }));
                 if (progress >= 100) clearInterval(interval);
-            }, 500);
+            }, 200);
         });
     };
 
@@ -108,12 +102,35 @@ export default function NewNotePage() {
         setFiles(files.filter(f => f.name !== fileName));
     };
 
-    const handleCreateSubject = () => {
+    const handleCreateSubject = async () => {
         if (!inputValue) return;
-        const newSubject = { value: inputValue.toLowerCase(), label: inputValue };
-        setSubjects([...subjects, newSubject]);
-        setValue(newSubject.value);
+        const newSubjectName = inputValue;
+
+        // Optimistic update
+        const newOption = { value: newSubjectName, label: newSubjectName };
+        setSubjects([...subjects, newOption]);
+        setValue(newSubjectName);
         setOpen(false);
+
+        // Server action
+        try {
+            await createSubject(newSubjectName);
+        } catch (error) {
+            console.error("Failed to create subject", error);
+            // Revert logic could go here
+        }
+    };
+
+    const handleSubmit = () => {
+        startTransition(async () => {
+            const formData = new FormData();
+            formData.append("title", title);
+            formData.append("subject", value);
+            formData.append("tags", JSON.stringify(tags));
+            formData.append("files", JSON.stringify(files.map(f => ({ name: f.name, size: f.size, type: f.type }))));
+
+            await createNote(formData);
+        });
     };
 
     return (
@@ -139,7 +156,13 @@ export default function NewNotePage() {
                         <div className="lg:col-span-1 bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="title" className="font-semibold">Tytuł notatki</Label>
-                                <Input id="title" placeholder="np. Wykład z algebry" className="bg-muted/50" />
+                                <Input
+                                    id="title"
+                                    placeholder="np. Wykład z algebry"
+                                    className="bg-muted/50"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -174,7 +197,7 @@ export default function NewNotePage() {
                                                         onClick={handleCreateSubject}
                                                     >
                                                         <Plus className="h-4 w-4" />
-                                                        Dodaj "{inputValue}"
+                                                        Dodaj &quot;{inputValue}&quot;
                                                     </Button>
                                                 </CommandEmpty>
                                                 <CommandGroup>
@@ -356,9 +379,13 @@ export default function NewNotePage() {
                         <Button variant="ghost" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
                             Anuluj
                         </Button>
-                        <Button className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11">
+                        <Button
+                            className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11"
+                            onClick={handleSubmit}
+                            disabled={isPending}
+                        >
                             <Sparkles className="size-4" />
-                            Przetwórz i Zapisz
+                            {isPending ? "Przetwarzanie..." : "Przetwórz i Zapisz"}
                         </Button>
                     </div>
                 </div>
