@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { processNoteBackground } from "@/lib/note-processing";
 
 export async function createNote(data: {
     title: string;
@@ -60,6 +62,11 @@ export async function createNote(data: {
                 })),
             },
         },
+    });
+
+    // Trigger async processing
+    after(() => {
+        processNoteBackground(note.id);
     });
 
     revalidatePath("/app");

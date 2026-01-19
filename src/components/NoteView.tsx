@@ -46,6 +46,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { useChat } from "@ai-sdk/react";
+import ReactMarkdown from "react-markdown";
 
 interface NoteViewProps {
     note: {
@@ -55,6 +57,7 @@ interface NoteViewProps {
         summary: string | null;
         createdAt: Date;
         files: { id: string; url: string; name: string }[];
+        messages: { id: string; role: string; content: string }[];
     };
 }
 
@@ -64,11 +67,21 @@ export function NoteView({ note }: NoteViewProps) {
     const [zoom, setZoom] = useState(100);
     const [title, setTitle] = useState(note.title || "Bez tytułu");
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [chatInput, setChatInput] = useState("");
-    const [messages, setMessages] = useState([
-        { role: "ai", content: "Cześć! Jestem Twoim asystentem AI. W czym mogę pomóc w związku z tą notatką?" }
-    ]);
 
+    // AI Chat Hook
+    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat({
+        api: '/api/chat',
+        body: { noteId: note.id },
+        initialMessages: note.messages.length > 0
+            ? note.messages.map(m => ({
+                id: m.id,
+                role: m.role as "user" | "assistant" | "system",
+                content: m.content
+            }))
+            : [
+                { id: 'welcome', role: 'assistant', content: 'Cześć! Jestem Twoim asystentem AI. W czym mogę pomóc w związku z tą notatką?' }
+            ]
+    });
 
     const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
@@ -86,22 +99,13 @@ export function NoteView({ note }: NoteViewProps) {
     const handleZoomIn = () => setZoom((prev) => Math.min(prev + 10, 200));
     const handleZoomOut = () => setZoom((prev) => Math.max(prev - 10, 50));
 
-    const handleSendMessage = () => {
-        if (!chatInput.trim()) return;
-        setMessages([...messages, { role: "user", content: chatInput }]);
-        const currentInput = chatInput;
-        setChatInput("");
-        // Simulate AI response
-        setTimeout(() => {
-            setMessages((prev) => [...prev, { role: "ai", content: `To ciekawe pytanie o "${currentInput}"! Na podstawie notatki...` }]);
-        }, 1000);
-    };
+    // Replaced with useChat's handleSubmit and append
+    /*
+    const handleSendMessage = () => { ... };
+    */
 
     const handlePredefinedQuestion = (question: string) => {
-        setMessages((prev) => [...prev, { role: "user", content: question }]);
-        setTimeout(() => {
-            setMessages((prev) => [...prev, { role: "ai", content: `Jasne, już odpowiadam na pytanie: "${question}".` }]);
-        }, 1000);
+        append({ role: "user", content: question });
     }
 
     const handlePrevFile = () => {
@@ -379,10 +383,14 @@ export function NoteView({ note }: NoteViewProps) {
                                             <ScrollArea className="h-full p-6">
                                                 {note.summary ? (
                                                     <div className="text-sm md:text-base leading-relaxed text-foreground whitespace-pre-wrap">
-                                                        {note.summary}
+                                                        <ReactMarkdown className="prose dark:prose-invert max-w-none">
+                                                            {note.summary}
+                                                        </ReactMarkdown>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-muted-foreground italic">Brak podsumowania.</p>
+                                                    <p className="text-muted-foreground italic">
+                                                        {note.content ? "Analiza zakończona, ale brak podsumowania." : "Oczekiwanie na analizę AI..."}
+                                                    </p>
                                                 )}
                                             </ScrollArea>
                                         </div>
@@ -402,7 +410,7 @@ export function NoteView({ note }: NoteViewProps) {
                                                 <div className="flex flex-col gap-4">
                                                     {messages.map((msg, i) => (
                                                         <div
-                                                            key={i}
+                                                            key={msg.id || i}
                                                             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                                                         >
                                                             <div
@@ -411,43 +419,52 @@ export function NoteView({ note }: NoteViewProps) {
                                                                     : "bg-gray-100 dark:bg-zinc-800 text-foreground rounded-bl-sm"
                                                                     }`}
                                                             >
-                                                                {msg.content}
+                                                                <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm break-words">
+                                                                    {msg.content}
+                                                                </ReactMarkdown>
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    {isLoading && (
+                                                        <div className="flex justify-start">
+                                                            <div className="bg-gray-100 dark:bg-zinc-800 text-foreground rounded-bl-sm p-3 rounded-2xl">
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </ScrollArea>
 
                                             <div className="p-3 border-t bg-white dark:bg-zinc-900">
                                                 {/* Suggested Questions */}
                                                 <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Zrób test")}>
-                                                        Zrób test
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Zrób quiz z tej notatki")}>
+                                                        Zrób quiz
                                                     </Button>
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Wyjaśnij pojęcia")}>
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Wyjaśnij kluczowe pojęcia")}>
                                                         Wyjaśnij pojęcia
                                                     </Button>
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Streść")}>
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Streść to w 3 punktach")}>
                                                         Streść
                                                     </Button>
                                                 </div>
 
-                                                <div className="relative">
+                                                <form onSubmit={handleSubmit} className="relative">
                                                     <Input
                                                         placeholder="Zapytaj o cokolwiek..."
-                                                        value={chatInput}
-                                                        onChange={(e) => setChatInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                                                        value={input}
+                                                        onChange={handleInputChange}
                                                         className="pr-10 rounded-full bg-gray-50 dark:bg-zinc-800 border-transparent focus:bg-white focus:border-[#1E90FF] transition-all"
                                                     />
                                                     <Button
+                                                        type="submit"
                                                         size="icon"
-                                                        onClick={handleSendMessage}
+                                                        disabled={isLoading || !input.trim()}
                                                         className="absolute right-1 top-1 h-8 w-8 rounded-full bg-[#1E90FF] hover:bg-blue-600 text-white"
                                                     >
                                                         <Send className="w-3.5 h-3.5" />
                                                     </Button>
-                                                </div>
+                                                </form>
                                             </div>
                                         </div>
                                     </div>

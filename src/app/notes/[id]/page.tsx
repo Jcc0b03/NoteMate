@@ -19,6 +19,11 @@ export default async function NotePage({ params }: PageProps) {
         where: { id },
         include: {
             files: true,
+            messages: {
+                orderBy: {
+                    createdAt: 'asc'
+                }
+            }
         },
     });
 
