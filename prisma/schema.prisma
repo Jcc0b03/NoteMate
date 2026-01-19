@@ -14,8 +14,9 @@ model Note {
 
   imageUrl    String?     // URL do pliku w Vercel Blob (Main image/thumbnail)
   title       String?     @default("Nowa notatka")
-  subject     String?
+
   tags        String[]
+  sharedWith  String[]    // IDs of users this note is shared with
 
   // Dane wygenerowane przez AI
   content     String?     @db.Text // Pełna transkrypcja (OCR)
@@ -25,8 +26,21 @@ model Note {
   status      NoteStatus  @default(PROCESSING)
 
   // Relations
+  subjectId   String?
+  subject     Subject?    @relation(fields: [subjectId], references: [id])
+
   messages    Message[]
   files       NoteFile[]
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  userId    String   // ID użytkownika z Clerk (Owner)
+  name      String
+  notes     Note[]
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name]) // Prevent duplicate subjects for the same user
 }
 
 model NoteFile {
