@@ -12,8 +12,12 @@ import {
   Download,
   Edit2,
   Save,
-  X
+  X,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,10 +36,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const MOCK_IMAGES = [
+  "https://images.unsplash.com/photo-1517842645767-c639042777db?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+  "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+  "https://images.unsplash.com/photo-1456324504439-367cee101252?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+];
+
 export default function NotePage() {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [zoom, setZoom] = useState(100);
   const [title, setTitle] = useState("Notatka z Biologii");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState([
       { role: "ai", content: "Cześć! Jestem Twoim asystentem AI. W czym mogę pomóc w związku z tą notatką?" }
@@ -58,6 +70,8 @@ Są to centra energetyczne komórki. Zachodzi w nich oddychanie komórkowe, w wy
 4. Podział komórkowy
 Mitoza prowadzi do powstania dwóch identycznych komórek potomnych. Mejoza jest podziałem redukcyjnym, w wyniku którego powstają gamety.`);
 
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 10, 200));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 10, 50));
 
@@ -79,17 +93,53 @@ Mitoza prowadzi do powstania dwóch identycznych komórek potomnych. Mejoza jest
       }, 1000);
   }
 
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prev) => (prev < MOCK_IMAGES.length - 1 ? prev + 1 : prev));
+  };
+
   return (
     <div className="h-screen flex flex-col font-sans bg-background text-foreground">
       {/* Header */}
       <header className="border-b p-4 flex justify-between items-center bg-card">
-        <div className="flex flex-col">
-           <input
-             value={title}
-             onChange={(e) => setTitle(e.target.value)}
-             className="text-xl md:text-2xl font-bold bg-transparent border-none outline-none focus:ring-0 text-foreground p-0"
-           />
-           <span className="text-xs md:text-sm text-muted-foreground">Dodano 15 paź 2023</span>
+        <div className="flex items-center gap-4">
+           <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+             <ArrowLeft className="w-5 h-5" />
+           </Button>
+           <div className="flex flex-col">
+             <div className="flex items-center gap-2 h-8">
+               {isEditingTitle ? (
+                 <div className="flex items-center gap-1">
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="h-8 text-xl font-bold w-[200px] md:w-[300px]"
+                      autoFocus
+                      onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
+                      onBlur={() => setIsEditingTitle(false)}
+                    />
+                 </div>
+               ) : (
+                 <>
+                   <h1 className="text-xl md:text-2xl font-bold text-foreground truncate max-w-[200px] md:max-w-md">
+                     {title}
+                   </h1>
+                   <Button
+                     variant="ghost"
+                     size="icon"
+                     className="h-6 w-6 text-muted-foreground hover:text-primary"
+                     onClick={() => setIsEditingTitle(true)}
+                   >
+                     <Edit2 className="w-3 h-3" />
+                   </Button>
+                 </>
+               )}
+             </div>
+             <span className="text-xs md:text-sm text-muted-foreground mt-1">Dodano 15 paź 2023</span>
+           </div>
         </div>
         <div className="flex items-center gap-2">
            <Button className="bg-[#1E90FF] hover:bg-blue-600 text-white gap-2 hidden md:flex">
@@ -127,10 +177,9 @@ Mitoza prowadzi do powstania dwóch identycznych komórek potomnych. Mejoza jest
                  className="transition-transform duration-200 ease-out origin-center"
                  style={{ transform: `scale(${zoom / 100})` }}
                >
-                 {/* Mock Image */}
                  <img
-                   src="https://images.unsplash.com/photo-1517842645767-c639042777db?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
-                   alt="Notatka"
+                   src={MOCK_IMAGES[currentImageIndex]}
+                   alt={`Notatka - strona ${currentImageIndex + 1}`}
                    className="max-w-full shadow-lg rounded-lg object-contain"
                    style={{ maxHeight: '80vh' }}
                  />
@@ -145,6 +194,33 @@ Mitoza prowadzi do powstania dwóch identycznych komórek potomnych. Mejoza jest
                    <ZoomIn className="w-4 h-4" />
                  </Button>
                </div>
+
+               {/* Image Navigation */}
+               {MOCK_IMAGES.length > 1 && (
+                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-background/80 backdrop-blur-sm p-2 rounded-full shadow-sm z-10">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePrevImage}
+                      disabled={currentImageIndex === 0}
+                      className="h-8 w-8 rounded-full"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium tabular-nums">
+                      {currentImageIndex + 1} / {MOCK_IMAGES.length}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleNextImage}
+                      disabled={currentImageIndex === MOCK_IMAGES.length - 1}
+                      className="h-8 w-8 rounded-full"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                 </div>
+               )}
             </div>
           </ResizablePanel>
 
