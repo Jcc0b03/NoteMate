@@ -23,16 +23,8 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { useRouter } from "next/navigation";
-import QRCode from "react-qr-code";
 import { useDropzone } from "react-dropzone";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from "@/components/ui/dialog";
-import { upload } from "@vercel/blob/client";
+import { MobileHandoffButton } from "@/components/MobileHandoffButton";
 
 const frameworks = [
     {
@@ -55,9 +47,15 @@ const frameworks = [
 
 type FileUploadStatus = 'uploading' | 'complete' | 'error';
 
+interface Filelike {
+    name: string;
+    size: number;
+    type: string;
+}
+
 interface FileUpload {
     id: string;
-    file: File;
+    file: File | Filelike;
     progress: number;
     status: FileUploadStatus;
     url?: string;
@@ -70,7 +68,6 @@ export default function NewNotePage() {
     const [value, setValue] = useState("");
     const [subjects, setSubjects] = useState(frameworks);
     const [inputValue, setInputValue] = useState("");
-    const [qrOpen, setQrOpen] = useState(false);
 
     const [files, setFiles] = useState<FileUpload[]>([]);
     const [tags, setTags] = useState<string[]>(["Ważne", "Egzamin"]);
@@ -90,6 +87,22 @@ export default function NewNotePage() {
         setTags(tags.filter(tag => tag !== tagToRemove));
     };
 
+    const handleMobileUpload = (blobs: any[]) => {
+        const newFiles: FileUpload[] = blobs.map(blob => ({
+            id: Math.random().toString(36).substring(7),
+            file: {
+                name: blob.pathname.split('/').pop() || 'mobile-upload.jpg',
+                size: blob.size,
+                type: 'image/jpeg' // Default assumption or infer from ext
+            },
+            progress: 100,
+            status: 'complete',
+            url: blob.url
+        }));
+
+        setFiles(prev => [...prev, ...newFiles]);
+    };
+
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const newFiles: FileUpload[] = acceptedFiles.map(file => ({
             id: Math.random().toString(36).substring(7),
@@ -106,7 +119,8 @@ export default function NewNotePage() {
                 const filename = fileUpload.file.name;
 
                 const formData = new FormData();
-                formData.append('file', fileUpload.file);
+                // We know it's a File here because it came from onDrop
+                formData.append('file', fileUpload.file as File);
                 formData.append('filename', filename);
 
                 // Simulate progress since fetch doesn't support it easily
@@ -199,7 +213,7 @@ export default function NewNotePage() {
                 files: files.map(f => ({
                     url: f.url!,
                     name: f.file.name,
-                    type: f.file.type,
+                    type: f.file.type || 'unknown',
                     size: f.file.size
                 })),
             });
@@ -358,15 +372,13 @@ export default function NewNotePage() {
                                     <h3 className="font-semibold">Pliki</h3>
                                     <p className="text-xs text-muted-foreground">Prześlij zdjęcia lub skany notatek</p>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <MobileHandoffButton
+                                    onUpload={handleMobileUpload}
                                     className="h-8 gap-2 text-xs"
-                                    onClick={() => setQrOpen(true)}
                                 >
                                     <Smartphone className="size-3.5" />
                                     Prześlij z telefonu
-                                </Button>
+                                </MobileHandoffButton>
                             </div>
 
                             {/* Dropzone */}
@@ -480,25 +492,6 @@ export default function NewNotePage() {
                         </Button>
                     </div>
                 </div>
-
-                <Dialog open={qrOpen} onOpenChange={setQrOpen}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Prześlij z telefonu</DialogTitle>
-                            <DialogDescription>
-                                Zeskanuj kod QR swoim telefonem, aby szybko przesłać zdjęcia notatek.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex flex-col items-center justify-center p-6 space-y-6">
-                            <div className="bg-white p-4 rounded-xl border shadow-sm">
-                                <QRCode value="https://notemate.app/upload/123" size={200} />
-                            </div>
-                            <p className="text-sm text-center text-muted-foreground max-w-[260px]">
-                                Upewnij się, że oba urządzenia są podłączone do Internetu.
-                            </p>
-                        </div>
-                    </DialogContent>
-                </Dialog>
             </div>
         </>
     );
