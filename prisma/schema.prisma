@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Note {
+  id          String      @id @default(cuid())
+  userId      String      // ID użytkownika z Clerk
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  imageUrl    String?     // URL do pliku w Vercel Blob (Main image/thumbnail)
+  title       String?     @default("Nowa notatka")
+
+  tags        String[]
+  sharedWith  String[]    // IDs of users this note is shared with
+
+  // Dane wygenerowane przez AI
+  content     String?     @db.Text // Pełna transkrypcja (OCR)
+  summary     String?     @db.Text // Krótkie podsumowanie
+
+  // Status przetwarzania
+  status      NoteStatus  @default(PROCESSING)
+
+  // Relations
+  subjectId   String?
+  subject     Subject?    @relation(fields: [subjectId], references: [id])
+
+  messages    Message[]
+  files       NoteFile[]
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  userId    String   // ID użytkownika z Clerk (Owner)
+  name      String
+  notes     Note[]
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name]) // Prevent duplicate subjects for the same user
+}
+
+model NoteFile {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  type      String   // e.g., "image/png", "application/pdf"
+  size      Int      // File size in bytes
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  role      Role
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+enum NoteStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum Role {
+  user
+  assistant
+  system
+}

@@ -6,8 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { currentUser } from "@clerk/nextjs/server";
 
+import { prisma } from "@/lib/prisma";
+
 export default async function Dashboard() {
     const user = await currentUser();
+
+    const notes = await prisma.note.findMany({
+        where: {
+            userId: user?.id,
+        },
+        include: {
+            subject: true,
+        },
+        orderBy: {
+            createdAt: 'desc',
+        },
+    });
 
     return (
         <div className="space-y-10">
@@ -74,27 +88,28 @@ export default async function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <NoteCard
-                        title="Całki Nieoznaczone"
-                        preview="Wprowadzenie do całek, podstawowe wzory i przykłady..."
-                        date="2 godz. temu"
-                        tag="Matematyka"
-                        color="blue"
-                    />
-                    <NoteCard
-                        title="Wojna Trzydziestoletnia"
-                        preview="Notatki z wykładu prof. Nowaka, przyczyny i skutki..."
-                        date="5 min temu"
-                        tag="Historia"
-                        color="orange"
-                    />
-                    <NoteCard
-                        title="Termodynamika - Wstęp"
-                        preview="Pierwsza zasada termodynamiki, układy otwarte i zamknięte."
-                        date="1 dzień temu"
-                        tag="Fizyka"
-                        color="green"
-                    />
+                    {notes.map((note) => {
+                        const subjectName = note.subject?.name || (note.tags.length > 0 ? note.tags[0] : "Inne");
+                        const colorMap: Record<string, string> = {
+                            "matematyka": "blue",
+                            "fizyka": "green",
+                            "historia": "orange",
+                            "biologia": "purple"
+                        };
+                        const color = colorMap[subjectName.toLowerCase()] || "blue";
+
+                        return (
+                            <Link href={`/app/notes/${note.id}`} key={note.id}>
+                                <NoteCard
+                                    title={note.title || "Bez tytułu"}
+                                    preview={note.summary || note.content || "Oczekiwanie na przetworzenie przez AI..."}
+                                    date={new Date(note.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                                    tag={subjectName}
+                                    color={color}
+                                />
+                            </Link>
+                        );
+                    })}
                     <Link href="/app/new" className="h-full">
                         <NewNoteCard />
                     </Link>

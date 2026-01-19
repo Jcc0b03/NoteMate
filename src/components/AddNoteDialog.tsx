@@ -91,12 +91,12 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                     access: 'public',
                     handleUploadUrl: '/api/upload',
                     onUploadProgress: (progressEvent) => {
-                         setFiles(prev => prev.map(f => {
-                             if (f.id === fileUpload.id) {
-                                 return { ...f, progress: progressEvent.percentage };
-                             }
-                             return f;
-                         }));
+                        setFiles(prev => prev.map(f => {
+                            if (f.id === fileUpload.id) {
+                                return { ...f, progress: progressEvent.percentage };
+                            }
+                            return f;
+                        }));
                     }
                 });
 
@@ -108,7 +108,7 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                 }));
             } catch (error) {
                 console.error("Upload error:", error);
-                 setFiles(prev => prev.map(f => {
+                setFiles(prev => prev.map(f => {
                     if (f.id === fileUpload.id) {
                         return { ...f, status: 'error', error: 'Upload failed' };
                     }
@@ -127,8 +127,19 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
         maxSize: 10 * 1024 * 1024 // 10MB
     });
 
-    const removeFile = (id: string) => {
-        setFiles(files.filter(f => f.id !== id));
+    const removeFile = async (id: string) => {
+        const fileToRemove = files.find(f => f.id === id);
+        if (fileToRemove?.url) {
+            try {
+                await fetch('/api/upload', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ url: fileToRemove.url }),
+                });
+            } catch (error) {
+                console.error("Failed to delete file:", error);
+            }
+        }
+        setFiles(prev => prev.filter(f => f.id !== id));
     };
 
     const formatFileSize = (bytes: number) => {
@@ -296,11 +307,11 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                                                 <div className={cn(
                                                     "size-10 rounded-lg flex items-center justify-center shrink-0",
                                                     file.status === 'error' ? "bg-red-100 text-red-600" :
-                                                    file.status === 'completed' ? "bg-green-100 text-green-600" :
-                                                    "bg-blue-100 text-blue-600"
+                                                        file.status === 'completed' ? "bg-green-100 text-green-600" :
+                                                            "bg-blue-100 text-blue-600"
                                                 )}>
                                                     {file.status === 'error' ? <AlertCircle className="size-5" /> :
-                                                     file.file.type.includes('image') ? <ImageIcon className="size-5" /> : <FileText className="size-5" />}
+                                                        file.file.type.includes('image') ? <ImageIcon className="size-5" /> : <FileText className="size-5" />}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between mb-1">
@@ -308,13 +319,13 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                                                         <div className={cn(
                                                             "flex items-center gap-1.5 text-xs font-semibold",
                                                             file.status === 'error' ? "text-red-600" :
-                                                            file.status === 'completed' ? "text-green-600" :
-                                                            "text-blue-600"
+                                                                file.status === 'completed' ? "text-green-600" :
+                                                                    "text-blue-600"
                                                         )}>
                                                             {file.status === 'completed' && <div className="size-1.5 rounded-full bg-green-600" />}
                                                             {file.status === 'completed' ? "Gotowe" :
-                                                             file.status === 'error' ? "Błąd" :
-                                                             "Wysyłanie..."}
+                                                                file.status === 'error' ? "Błąd" :
+                                                                    "Wysyłanie..."}
                                                         </div>
                                                     </div>
                                                     {file.status !== 'error' && (

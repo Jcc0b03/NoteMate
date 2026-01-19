@@ -1,5 +1,7 @@
 "use client";
 
+import { createNote } from "@/actions/note";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -100,18 +102,31 @@ export default function NewNotePage() {
 
         for (const fileUpload of newFiles) {
             try {
-                const blob = await upload(fileUpload.file.name, fileUpload.file, {
-                    access: 'public',
-                    handleUploadUrl: '/api/upload',
-                    onUploadProgress: (progressEvent) => {
-                         setFiles(prev => prev.map(f => {
-                             if (f.id === fileUpload.id) {
-                                 return { ...f, progress: progressEvent.percentage };
-                             }
-                             return f;
-                         }));
+                // Determine file name
+                const filename = fileUpload.file.name;
+
+                const formData = new FormData();
+                formData.append('file', fileUpload.file);
+                formData.append('filename', filename);
+
+                // Simulate progress since fetch doesn't support it easily
+                setFiles(prev => prev.map(f => {
+                    if (f.id === fileUpload.id) {
+                        return { ...f, progress: 50 };
                     }
+                    return f;
+                }));
+
+                const response = await fetch('/api/upload-private', {
+                    method: 'POST',
+                    body: formData,
                 });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const blob = await response.json();
 
                 setFiles(prev => prev.map(f => {
                     if (f.id === fileUpload.id) {
@@ -121,7 +136,7 @@ export default function NewNotePage() {
                 }));
             } catch (error) {
                 console.error("Upload error:", error);
-                 setFiles(prev => prev.map(f => {
+                setFiles(prev => prev.map(f => {
                     if (f.id === fileUpload.id) {
                         return { ...f, status: 'error', error: 'Upload failed' };
                     }
@@ -140,7 +155,18 @@ export default function NewNotePage() {
         maxSize: 10 * 1024 * 1024 // 10MB
     });
 
-    const removeFile = (id: string) => {
+    const removeFile = async (id: string) => {
+        const fileToRemove = files.find(f => f.id === id);
+        if (fileToRemove?.url) {
+            try {
+                await fetch('/api/upload', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ url: fileToRemove.url }),
+                });
+            } catch (error) {
+                console.error("Failed to delete file:", error);
+            }
+        }
         setFiles(files.filter(f => f.id !== id));
     };
 
@@ -150,6 +176,40 @@ export default function NewNotePage() {
         setSubjects([...subjects, newSubject]);
         setValue(newSubject.value);
         setOpen(false);
+    };
+
+    const [title, setTitle] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
+        if (files.length === 0) return;
+        setIsSaving(true);
+        try {
+            // Determine subject name
+            let subjectName = "";
+            if (value) {
+                const selected = subjects.find(s => s.value === value);
+                subjectName = selected ? selected.label : value;
+            }
+
+            await createNote({
+                title,
+                subjectName,
+                tags,
+                files: files.map(f => ({
+                    url: f.url!,
+                    name: f.file.name,
+                    type: f.file.type,
+                    size: f.file.size
+                })),
+            });
+            router.push("/app");
+        } catch (error) {
+            console.error("Failed to save note:", error);
+            // You might want to show a toast here
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -175,7 +235,13 @@ export default function NewNotePage() {
                         <div className="lg:col-span-1 bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="title" className="font-semibold">Tytuł notatki</Label>
-                                <Input id="title" placeholder="np. Wykład z algebry" className="bg-muted/50" />
+                                <Input
+                                    id="title"
+                                    placeholder="np. Wykład z algebry"
+                                    className="bg-muted/50"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -342,11 +408,11 @@ export default function NewNotePage() {
                                             <div className={cn(
                                                 "size-12 rounded-xl flex items-center justify-center shrink-0",
                                                 file.status === 'complete' ? "bg-green-100 text-green-600" :
-                                                file.status === 'error' ? "bg-red-100 text-red-600" :
-                                                "bg-blue-100 text-blue-600"
+                                                    file.status === 'error' ? "bg-red-100 text-red-600" :
+                                                        "bg-blue-100 text-blue-600"
                                             )}>
                                                 {file.status === 'error' ? <AlertCircle className="size-6" /> :
-                                                 file.file.name.endsWith('.pdf') ? <FileText className="size-6" /> : <ImageIcon className="size-6" />}
+                                                    file.file.name.endsWith('.pdf') ? <FileText className="size-6" /> : <ImageIcon className="size-6" />}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1.5">
@@ -354,8 +420,8 @@ export default function NewNotePage() {
                                                     <div className={cn(
                                                         "flex items-center gap-1.5 text-xs font-bold",
                                                         file.status === 'complete' ? "text-green-600" :
-                                                        file.status === 'error' ? "text-red-600" :
-                                                        "text-blue-600"
+                                                            file.status === 'error' ? "text-red-600" :
+                                                                "text-blue-600"
                                                     )}>
                                                         {file.status === 'complete' ? (
                                                             <>
@@ -406,10 +472,11 @@ export default function NewNotePage() {
                         </Button>
                         <Button
                             className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20 rounded-xl px-6 h-11"
-                            disabled={files.some(f => f.status === 'uploading')}
+                            disabled={files.some(f => f.status === 'uploading') || files.length === 0 || isSaving}
+                            onClick={handleSave}
                         >
                             <Sparkles className="size-4" />
-                            Przetwórz i Zapisz
+                            {isSaving ? "Zapisywanie..." : "Przetwórz i Zapisz"}
                         </Button>
                     </div>
                 </div>
