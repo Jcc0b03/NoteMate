@@ -11,8 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
+import { Sparkles, Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Plus, Check, ChevronsUpDown, AlertCircle } from "lucide-react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
     Command,
@@ -27,6 +27,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { useDropzone } from "react-dropzone";
+import { upload } from "@vercel/blob/client";
 
 const frameworks = [
     {
@@ -47,11 +49,23 @@ const frameworks = [
     },
 ];
 
+type FileUploadStatus = 'uploading' | 'completed' | 'error';
+
+interface FileUpload {
+    id: string;
+    file: File;
+    progress: number;
+    status: FileUploadStatus;
+    url?: string;
+    error?: string;
+}
+
 export function AddNoteDialog({ children }: { children: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [value, setValue] = useState("");
     const [subjects, setSubjects] = useState(frameworks);
     const [inputValue, setInputValue] = useState("");
+    const [files, setFiles] = useState<FileUpload[]>([]);
 
     const handleCreateSubject = () => {
         if (!inputValue) return;
@@ -59,6 +73,70 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
         setSubjects([...subjects, newSubject]);
         setValue(newSubject.value);
         setOpen(false);
+    };
+
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        const newFiles: FileUpload[] = acceptedFiles.map(file => ({
+            id: Math.random().toString(36).substring(7),
+            file,
+            progress: 0,
+            status: 'uploading'
+        }));
+
+        setFiles(prev => [...prev, ...newFiles]);
+
+        for (const fileUpload of newFiles) {
+            try {
+                const blob = await upload(fileUpload.file.name, fileUpload.file, {
+                    access: 'public',
+                    handleUploadUrl: '/api/upload',
+                    onUploadProgress: (progressEvent) => {
+                         setFiles(prev => prev.map(f => {
+                             if (f.id === fileUpload.id) {
+                                 return { ...f, progress: progressEvent.percentage };
+                             }
+                             return f;
+                         }));
+                    }
+                });
+
+                setFiles(prev => prev.map(f => {
+                    if (f.id === fileUpload.id) {
+                        return { ...f, status: 'completed', url: blob.url, progress: 100 };
+                    }
+                    return f;
+                }));
+            } catch (error) {
+                console.error("Upload error:", error);
+                 setFiles(prev => prev.map(f => {
+                    if (f.id === fileUpload.id) {
+                        return { ...f, status: 'error', error: 'Upload failed' };
+                    }
+                    return f;
+                }));
+            }
+        }
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+            'application/pdf': ['.pdf']
+        },
+        maxSize: 10 * 1024 * 1024 // 10MB
+    });
+
+    const removeFile = (id: string) => {
+        setFiles(files.filter(f => f.id !== id));
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
     return (
@@ -182,12 +260,21 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                                 </div>
 
                                 {/* Dropzone */}
-                                <div className="border-2 border-dashed border-primary/20 bg-blue-50/30 dark:bg-blue-900/5 rounded-xl h-48 flex flex-col items-center justify-center text-center gap-4 transition-colors hover:border-primary/40 hover:bg-blue-50/50">
+                                <div
+                                    {...getRootProps()}
+                                    className={cn(
+                                        "border-2 border-dashed border-primary/20 bg-blue-50/30 dark:bg-blue-900/5 rounded-xl h-48 flex flex-col items-center justify-center text-center gap-4 transition-colors hover:border-primary/40 hover:bg-blue-50/50 cursor-pointer",
+                                        isDragActive && "border-primary bg-blue-50/50"
+                                    )}
+                                >
+                                    <input {...getInputProps()} />
                                     <div className="size-12 rounded-full bg-white dark:bg-card shadow-sm flex items-center justify-center text-primary">
                                         <Upload className="size-6" />
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="font-semibold text-sm">Upuść notatki tutaj</p>
+                                        <p className="font-semibold text-sm">
+                                            {isDragActive ? "Upuść pliki tutaj..." : "Upuść notatki tutaj"}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">lub kliknij, aby przeglądać pliki</p>
                                     </div>
                                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -198,60 +285,65 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                                 </div>
 
                                 {/* File List */}
-                                <div className="space-y-3">
-                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Przesyłanie (2)</h4>
+                                {files.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                            Przesyłanie ({files.length})
+                                        </h4>
 
-                                    {/* File Item 1 - Complete */}
-                                    <div className="bg-white dark:bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 shrink-0">
-                                            <FileText className="size-5" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <p className="text-sm font-medium truncate">Fizyka_Notatki_01.pdf</p>
-                                                <div className="flex items-center gap-1.5 text-green-600 text-xs font-semibold">
-                                                    <div className="size-1.5 rounded-full bg-green-600" />
-                                                    Gotowe
+                                        {files.map((file) => (
+                                            <div key={file.id} className="bg-white dark:bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+                                                <div className={cn(
+                                                    "size-10 rounded-lg flex items-center justify-center shrink-0",
+                                                    file.status === 'error' ? "bg-red-100 text-red-600" :
+                                                    file.status === 'completed' ? "bg-green-100 text-green-600" :
+                                                    "bg-blue-100 text-blue-600"
+                                                )}>
+                                                    {file.status === 'error' ? <AlertCircle className="size-5" /> :
+                                                     file.file.type.includes('image') ? <ImageIcon className="size-5" /> : <FileText className="size-5" />}
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <Progress value={100} className="h-1 bg-green-100 [&>div]:bg-green-500" />
-                                                <span className="text-[10px] text-muted-foreground tabular-nums">100%</span>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                                                <span>2.4 MB</span>
-                                            </div>
-                                        </div>
-                                        <button className="text-muted-foreground hover:text-destructive transition-colors p-1">
-                                            <Trash2 className="size-4" />
-                                        </button>
-                                    </div>
-
-                                    {/* File Item 2 - Uploading */}
-                                    <div className="bg-white dark:bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-                                        <div className="size-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                            <ImageIcon className="size-5" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <p className="text-sm font-medium truncate">Szkic_Biologia_Strona3.png</p>
-                                                <div className="flex items-center gap-1.5 text-blue-600 text-xs font-semibold">
-                                                    Wysyłanie...
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <p className="text-sm font-medium truncate" title={file.file.name}>{file.file.name}</p>
+                                                        <div className={cn(
+                                                            "flex items-center gap-1.5 text-xs font-semibold",
+                                                            file.status === 'error' ? "text-red-600" :
+                                                            file.status === 'completed' ? "text-green-600" :
+                                                            "text-blue-600"
+                                                        )}>
+                                                            {file.status === 'completed' && <div className="size-1.5 rounded-full bg-green-600" />}
+                                                            {file.status === 'completed' ? "Gotowe" :
+                                                             file.status === 'error' ? "Błąd" :
+                                                             "Wysyłanie..."}
+                                                        </div>
+                                                    </div>
+                                                    {file.status !== 'error' && (
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <Progress
+                                                                value={file.progress}
+                                                                className={cn(
+                                                                    "h-1",
+                                                                    file.status === 'completed' ? "bg-green-100 [&>div]:bg-green-500" : "bg-blue-100 [&>div]:bg-blue-500"
+                                                                )}
+                                                            />
+                                                            <span className="text-[10px] text-muted-foreground tabular-nums">{Math.round(file.progress)}%</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
+                                                        <span>{formatFileSize(file.file.size)}</span>
+                                                        {file.error && <span className="text-red-500">{file.error}</span>}
+                                                    </div>
                                                 </div>
+                                                <button
+                                                    onClick={() => removeFile(file.id)}
+                                                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                                                >
+                                                    {file.status === 'uploading' ? <X className="size-4" /> : <Trash2 className="size-4" />}
+                                                </button>
                                             </div>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <Progress value={65} className="h-1 bg-blue-100 [&>div]:bg-blue-500" />
-                                                <span className="text-[10px] text-muted-foreground tabular-nums">65%</span>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                                                <span>4.1 MB</span>
-                                            </div>
-                                        </div>
-                                        <button className="text-muted-foreground hover:text-destructive transition-colors p-1">
-                                            <X className="size-4" />
-                                        </button>
+                                        ))}
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -260,7 +352,10 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                 {/* Footer */}
                 <div className="p-6 border-t border-border mt-6 flex items-center justify-end gap-3 bg-muted/10">
                     <Button variant="ghost">Anuluj</Button>
-                    <Button className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20">
+                    <Button
+                        disabled={files.some(f => f.status === 'uploading')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white gap-2 shadow-lg shadow-blue-500/20"
+                    >
                         <Sparkles className="size-4" />
                         Przetwórz i Zapisz
                     </Button>
