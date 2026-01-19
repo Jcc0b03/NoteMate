@@ -58,6 +58,7 @@ model NoteFile {
   name      String
   type      String   // e.g., "image/png", "application/pdf"
   size      Int      // File size in bytes
+  sourceName String?  // Oryginalna nazwa pliku
   createdAt DateTime @default(now())
 }
 

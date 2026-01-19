@@ -1,5 +1,6 @@
 "use server";
 
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
@@ -53,6 +54,7 @@ export async function createNote(data: {
                 create: files.map((f) => ({
                     url: f.url,
                     name: f.name,
+                    sourceName: f.name,
                     type: f.type,
                     size: f.size,
                 })),
@@ -62,4 +64,75 @@ export async function createNote(data: {
 
     revalidatePath("/app");
     return { success: true, noteId: note.id };
+}
+
+export async function updateNoteTitle(noteId: string, newTitle: string) {
+    const user = await currentUser();
+
+    if (!user) {
+        throw new Error("Unauthorized");
+    }
+
+    try {
+        await prisma.note.update({
+            where: {
+                id: noteId,
+                userId: user.id, // Ensure ownership
+            },
+            data: {
+                title: newTitle,
+            },
+        });
+
+        revalidatePath(`/notes/${noteId}`);
+        revalidatePath("/app");
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating note title:", error);
+        return { success: false, error: "Failed to update title" };
+    }
+}
+
+export async function deleteNote(noteId: string) {
+    const user = await currentUser();
+
+    if (!user) {
+        throw new Error("Unauthorized");
+    }
+
+    try {
+        const note = await prisma.note.findUnique({
+            where: {
+                id: noteId,
+                userId: user.id,
+            },
+            include: {
+                files: true,
+            },
+        });
+
+        if (!note) {
+            return { success: false, error: "Note not found" };
+        }
+
+        // Delete files from Blob Storage
+        if (note.files.length > 0) {
+            await Promise.all(
+                note.files.map((file) => del(file.url))
+            );
+        }
+
+        // Delete note from database (Cascades to NoteFile)
+        await prisma.note.delete({
+            where: {
+                id: noteId,
+            },
+        });
+
+        revalidatePath("/app");
+        return { success: true };
+    } catch (error) {
+        console.error("Error deleting note:", error);
+        return { success: false, error: "Failed to delete note" };
+    }
 }

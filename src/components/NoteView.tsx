@@ -15,12 +15,13 @@ import {
     X,
     ArrowLeft,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    FileArchive
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// import { Textarea } from "@/components/ui/textarea"; // Removed
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     ResizablePanelGroup,
@@ -35,6 +36,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { updateNoteTitle, deleteNote } from "@/actions/note";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 interface NoteViewProps {
     note: {
@@ -58,14 +69,19 @@ export function NoteView({ note }: NoteViewProps) {
         { role: "ai", content: "Cześć! Jestem Twoim asystentem AI. W czym mogę pomóc w związku z tą notatką?" }
     ]);
 
-    const [isEditing, setIsEditing] = useState(false);
-    const [noteContent, setNoteContent] = useState(note.content || note.summary || "Brak treści do wyświetlenia. AI wciąż przetwarza ten plik lub nie udało się odczytać tekstu.");
 
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
-    const images = note.files.length > 0
-        ? note.files.map(f => `/api/file?fileId=${f.id}`)
-        : ["/placeholder-image-if-no-files.png"]; // Or handle empty state better
+    const files = note.files.length > 0
+        ? note.files.map(f => {
+            const isPdf = f.name.toLowerCase().endsWith('.pdf');
+            return {
+                url: `/api/file?fileId=${f.id}`,
+                type: isPdf ? 'pdf' : 'image',
+                name: f.name
+            };
+        })
+        : [{ url: "/placeholder-image-if-no-files.png", type: 'image', name: 'Placeholder' }];
 
     const handleZoomIn = () => setZoom((prev) => Math.min(prev + 10, 200));
     const handleZoomOut = () => setZoom((prev) => Math.max(prev - 10, 50));
@@ -88,12 +104,42 @@ export function NoteView({ note }: NoteViewProps) {
         }, 1000);
     }
 
-    const handlePrevImage = () => {
-        setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    const handlePrevFile = () => {
+        setCurrentFileIndex((prev) => (prev > 0 ? prev - 1 : prev));
     };
 
-    const handleNextImage = () => {
-        setCurrentImageIndex((prev) => (prev < images.length - 1 ? prev + 1 : prev));
+    const handleNextFile = () => {
+        setCurrentFileIndex((prev) => (prev < files.length - 1 ? prev + 1 : prev));
+    };
+
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+    const handleDeleteNote = async () => {
+        setIsDeleting(true);
+        const result = await deleteNote(note.id);
+        if (result.success) {
+            router.push("/app");
+        } else {
+            console.error("Failed to delete note:", result.error);
+            setIsDeleting(false);
+        }
+    };
+
+    const handleSaveTitle = async () => {
+        setIsEditingTitle(false);
+        if (title.trim() === "") {
+            setTitle(note.title || "Bez tytułu");
+            return;
+        }
+        if (title === note.title) return;
+
+        const result = await updateNoteTitle(note.id, title);
+        if (!result.success) {
+            console.error("Failed to update title:", result.error);
+            // Optionally revert title or show toast
+        }
     };
 
     return (
@@ -113,8 +159,12 @@ export function NoteView({ note }: NoteViewProps) {
                                         onChange={(e) => setTitle(e.target.value)}
                                         className="h-8 text-xl font-bold w-[200px] md:w-[300px]"
                                         autoFocus
-                                        onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
-                                        onBlur={() => setIsEditingTitle(false)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                handleSaveTitle();
+                                            }
+                                        }}
+                                        onBlur={handleSaveTitle}
                                     />
                                 </div>
                             ) : (
@@ -152,17 +202,79 @@ export function NoteView({ note }: NoteViewProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="text-destructive focus:text-destructive">
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                                onClick={() => setShowDeleteDialog(true)}
+                            >
                                 <Trash2 className="w-4 h-4 mr-2" /> Usuń notatkę
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Download className="w-4 h-4 mr-2" /> Pobierz tekst
+                            <DropdownMenuItem onClick={() => {
+                                if (!note.summary) return;
+                                const blob = new Blob([note.summary], { type: "text/plain" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `${note.title || "notatka"}_podsumowanie.txt`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }}>
+                                <Download className="w-4 h-4 mr-2" /> Pobierz podsumowanie
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={async (e) => {
+                                    e.preventDefault();
+                                    if (isDownloadingZip) return;
+                                    setIsDownloadingZip(true);
+                                    try {
+                                        const JSZip = (await import("jszip")).default;
+                                        const zip = new JSZip();
+
+                                        const filePromises = note.files.map(async (file) => {
+                                            try {
+                                                const response = await fetch(`/api/file?fileId=${file.id}`);
+                                                if (!response.ok) throw new Error("Network response was not ok");
+                                                const blob = await response.blob();
+                                                zip.file(file.name, blob);
+                                            } catch (error) {
+                                                console.error(`Failed to download file ${file.name}`, error);
+                                            }
+                                        });
+
+                                        await Promise.all(filePromises);
+
+                                        const content = await zip.generateAsync({ type: "blob" });
+                                        const url = URL.createObjectURL(content);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `${note.title || "notatka"}_pliki.zip`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                        console.error("Failed to generate zip", error);
+                                    } finally {
+                                        setIsDownloadingZip(false);
+                                    }
+                                }}
+                                disabled={isDownloadingZip}
+                                className="cursor-pointer"
+                            >
+                                {isDownloadingZip ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <FileArchive className="w-4 h-4 mr-2" />
+                                )}
+                                {isDownloadingZip ? "Pobieranie..." : "Pobierz pliki jako ZIP"}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </header>
 
+            {/* Content */}
             {/* Content */}
             <div className="flex-1 flex overflow-hidden">
                 <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"}>
@@ -172,15 +284,23 @@ export function NoteView({ note }: NoteViewProps) {
                         <div className="relative w-full h-full bg-gray-100 dark:bg-zinc-900 overflow-hidden flex items-center justify-center p-4">
                             {note.files.length > 0 ? (
                                 <div
-                                    className="transition-transform duration-200 ease-out origin-center"
+                                    className="transition-transform duration-200 ease-out origin-center w-full h-full flex items-center justify-center"
                                     style={{ transform: `scale(${zoom / 100})` }}
                                 >
-                                    <img
-                                        src={images[currentImageIndex]}
-                                        alt={`Notatka - strona ${currentImageIndex + 1}`}
-                                        className="max-w-full shadow-lg rounded-lg object-contain"
-                                        style={{ maxHeight: '80vh' }}
-                                    />
+                                    {files[currentFileIndex].type === 'pdf' ? (
+                                        <iframe
+                                            src={`${files[currentFileIndex].url}#toolbar=0`}
+                                            className="w-full h-full shadow-lg rounded-lg bg-white"
+                                            title={files[currentFileIndex].name}
+                                        />
+                                    ) : (
+                                        <img
+                                            src={files[currentFileIndex].url}
+                                            alt={`Notatka - ${files[currentFileIndex].name}`}
+                                            className="max-w-full shadow-lg rounded-lg object-contain"
+                                            style={{ maxHeight: '80vh' }}
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-muted-foreground flex flex-col items-center gap-2">
@@ -199,25 +319,25 @@ export function NoteView({ note }: NoteViewProps) {
                             </div>
 
                             {/* Image Navigation */}
-                            {images.length > 1 && (
+                            {files.length > 1 && (
                                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-background/80 backdrop-blur-sm p-2 rounded-full shadow-sm z-10">
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={handlePrevImage}
-                                        disabled={currentImageIndex === 0}
+                                        onClick={handlePrevFile}
+                                        disabled={currentFileIndex === 0}
                                         className="h-8 w-8 rounded-full"
                                     >
                                         <ChevronLeft className="w-4 h-4" />
                                     </Button>
                                     <span className="text-sm font-medium tabular-nums">
-                                        {currentImageIndex + 1} / {images.length}
+                                        {currentFileIndex + 1} / {files.length}
                                     </span>
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={handleNextImage}
-                                        disabled={currentImageIndex === images.length - 1}
+                                        onClick={handleNextFile}
+                                        disabled={currentFileIndex === files.length - 1}
                                         className="h-8 w-8 rounded-full"
                                     >
                                         <ChevronRight className="w-4 h-4" />
@@ -229,123 +349,106 @@ export function NoteView({ note }: NoteViewProps) {
 
                     <ResizableHandle withHandle />
 
-                    {/* Right Panel - AI Workspace */}
+                    {/* Right Panel - Content & Workspace */}
                     <ResizablePanel defaultSize={50} minSize={30}>
-                        <div className="h-full bg-background flex flex-col">
-                            <Tabs defaultValue="transcript" className="w-full h-full flex flex-col">
-                                <div className="border-b px-4">
-                                    <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-4">
+                        <div className="h-full bg-background flex flex-col p-4">
+                            <Tabs defaultValue="summary" className="w-full h-full flex flex-col">
+                                <div className="mb-4">
+                                    <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-6 border-b">
                                         <TabsTrigger
-                                            value="transcript"
-                                            className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#1E90FF] data-[state=active]:shadow-none rounded-none px-0 pb-2 pt-2"
+                                            value="summary"
+                                            className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#1E90FF] data-[state=active]:shadow-none data-[state=active]:text-[#1E90FF] rounded-none px-0 pb-3 pt-3 font-semibold text-muted-foreground transition-all focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none"
                                         >
-                                            Notatka
+                                            Podsumowanie
                                         </TabsTrigger>
                                         <TabsTrigger
                                             value="chat"
-                                            className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#1E90FF] data-[state=active]:shadow-none rounded-none px-0 pb-2 pt-2"
+                                            className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#1E90FF] data-[state=active]:shadow-none data-[state=active]:text-[#1E90FF] rounded-none px-0 pb-3 pt-3 font-semibold text-muted-foreground transition-all focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none"
                                         >
-                                            Czat z AI
+                                            Asystent AI
                                         </TabsTrigger>
                                     </TabsList>
                                 </div>
 
-                                <TabsContent value="transcript" className="flex-1 p-0 m-0 overflow-hidden">
-                                    <ScrollArea className="h-full p-6">
-                                        {note.summary && (
-                                            <div className="bg-[#F8F9FA] dark:bg-zinc-800 p-4 rounded-xl border border-border mb-6">
-                                                <h3 className="font-bold text-foreground mb-2">Podsumowanie</h3>
-                                                <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                                    {note.summary}
-                                                </div>
-                                            </div>
-                                        )}
+                                <TabsContent value="summary" className="flex-1 p-0 m-0 overflow-hidden">
+                                    <div className="h-full bg-white dark:bg-zinc-900 border rounded-xl shadow-sm flex flex-col overflow-hidden">
+                                        <div className="border-b px-4 h-12 flex items-center bg-white dark:bg-zinc-900">
+                                            <h3 className="font-semibold text-sm">Podsumowanie</h3>
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <ScrollArea className="h-full p-6">
+                                                {note.summary ? (
+                                                    <div className="text-sm md:text-base leading-relaxed text-foreground whitespace-pre-wrap">
+                                                        {note.summary}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-muted-foreground italic">Brak podsumowania.</p>
+                                                )}
+                                            </ScrollArea>
+                                        </div>
+                                    </div>
+                                </TabsContent>
 
-                                        <div className="prose dark:prose-invert max-w-none text-foreground">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold m-0">Pełny Tekst</h3>
-                                                <div className="flex gap-2">
-                                                    {isEditing ? (
-                                                        <>
-                                                            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
-                                                                <X className="w-4 h-4 mr-2" /> Anuluj
-                                                            </Button>
-                                                            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="text-[#1E90FF] hover:text-blue-600">
-                                                                <Save className="w-4 h-4 mr-2" /> Zapisz
-                                                            </Button>
-                                                        </>
-                                                    ) : (
-                                                        <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
-                                                            <Edit2 className="w-4 h-4 mr-2" /> Edytuj
-                                                        </Button>
-                                                    )}
-                                                    <Button variant="ghost" size="sm" className="gap-2">
-                                                        <Copy className="w-4 h-4" /> Kopiuj
+
+
+                                <TabsContent value="chat" className="flex-1 p-0 m-0 overflow-hidden">
+                                    <div className="h-full bg-white dark:bg-zinc-900 border rounded-xl shadow-sm flex flex-col overflow-hidden">
+                                        <div className="border-b px-4 h-12 flex items-center bg-white dark:bg-zinc-900">
+                                            <h3 className="font-semibold text-sm">Asystent AI</h3>
+                                        </div>
+
+                                        <div className="flex-1 flex flex-col overflow-hidden">
+                                            <ScrollArea className="flex-1 p-4">
+                                                <div className="flex flex-col gap-4">
+                                                    {messages.map((msg, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                                                        >
+                                                            <div
+                                                                className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === "user"
+                                                                    ? "bg-[#1E90FF] text-white rounded-br-sm"
+                                                                    : "bg-gray-100 dark:bg-zinc-800 text-foreground rounded-bl-sm"
+                                                                    }`}
+                                                            >
+                                                                {msg.content}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+
+                                            <div className="p-3 border-t bg-white dark:bg-zinc-900">
+                                                {/* Suggested Questions */}
+                                                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Zrób test")}>
+                                                        Zrób test
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Wyjaśnij pojęcia")}>
+                                                        Wyjaśnij pojęcia
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Streść")}>
+                                                        Streść
+                                                    </Button>
+                                                </div>
+
+                                                <div className="relative">
+                                                    <Input
+                                                        placeholder="Zapytaj o cokolwiek..."
+                                                        value={chatInput}
+                                                        onChange={(e) => setChatInput(e.target.value)}
+                                                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                                                        className="pr-10 rounded-full bg-gray-50 dark:bg-zinc-800 border-transparent focus:bg-white focus:border-[#1E90FF] transition-all"
+                                                    />
+                                                    <Button
+                                                        size="icon"
+                                                        onClick={handleSendMessage}
+                                                        className="absolute right-1 top-1 h-8 w-8 rounded-full bg-[#1E90FF] hover:bg-blue-600 text-white"
+                                                    >
+                                                        <Send className="w-3.5 h-3.5" />
                                                     </Button>
                                                 </div>
                                             </div>
-
-                                            {isEditing ? (
-                                                <Textarea
-                                                    className="min-h-[300px] font-sans text-sm md:text-base leading-relaxed"
-                                                    value={noteContent}
-                                                    onChange={(e) => setNoteContent(e.target.value)}
-                                                />
-                                            ) : (
-                                                <p className="whitespace-pre-wrap leading-relaxed text-sm md:text-base">
-                                                    {noteContent}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </ScrollArea>
-                                </TabsContent>
-
-                                <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 overflow-hidden">
-                                    <ScrollArea className="flex-1 p-4">
-                                        <div className="flex flex-col gap-4">
-                                            {messages.map((msg, i) => (
-                                                <div
-                                                    key={i}
-                                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                                                >
-                                                    <div
-                                                        className={`max-w-[80%] p-3 rounded-xl text-sm md:text-base ${msg.role === "user"
-                                                            ? "bg-[#1E90FF] text-white rounded-br-none"
-                                                            : "bg-[#F1F5F9] dark:bg-zinc-800 text-foreground rounded-bl-none"
-                                                            }`}
-                                                    >
-                                                        {msg.content}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </ScrollArea>
-
-                                    <div className="p-4 border-t bg-background">
-                                        {/* Suggested Questions */}
-                                        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-                                            <Button variant="outline" size="sm" className="rounded-full whitespace-nowrap" onClick={() => handlePredefinedQuestion("Zrób test z tej wiedzy")}>
-                                                Zrób test z tej wiedzy
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="rounded-full whitespace-nowrap" onClick={() => handlePredefinedQuestion("Wyjaśnij trudne pojęcia")}>
-                                                Wyjaśnij trudne pojęcia
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="rounded-full whitespace-nowrap" onClick={() => handlePredefinedQuestion("Streść w 3 zdaniach")}>
-                                                Streść w 3 zdaniach
-                                            </Button>
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="Zadaj pytanie do notatki..."
-                                                value={chatInput}
-                                                onChange={(e) => setChatInput(e.target.value)}
-                                                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                                                className="flex-1"
-                                            />
-                                            <Button onClick={handleSendMessage} className="bg-[#1E90FF] hover:bg-blue-600">
-                                                <Send className="w-4 h-4" />
-                                            </Button>
                                         </div>
                                     </div>
                                 </TabsContent>
@@ -354,6 +457,36 @@ export function NoteView({ note }: NoteViewProps) {
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
-        </div>
+
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Czy na pewno chcesz usunąć tę notatkę?</DialogTitle>
+                        <DialogDescription>
+                            Tej operacji nie można cofnąć. Notatka oraz wszystkie powiązane pliki zostaną trwale usunięte.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                            Anuluj
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteNote}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Usuwanie...
+                                </>
+                            ) : (
+                                "Usuń"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 }

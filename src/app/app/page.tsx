@@ -99,13 +99,15 @@ export default async function Dashboard() {
                         const color = colorMap[subjectName.toLowerCase()] || "blue";
 
                         return (
-                            <Link href={`/app/notes/${note.id}`} key={note.id}>
+                            <Link href={`/notes/${note.id}`} key={note.id}>
                                 <NoteCard
+                                    id={note.id}
                                     title={note.title || "Bez tytułu"}
                                     preview={note.summary || note.content || "Oczekiwanie na przetworzenie przez AI..."}
                                     date={new Date(note.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
                                     tag={subjectName}
                                     color={color}
+                                    status={note.status}
                                 />
                             </Link>
                         );

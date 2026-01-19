@@ -17,9 +17,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+
+    // Generate random suffix
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const lastDotIndex = filename.lastIndexOf('.');
+    const name = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
+    const ext = lastDotIndex !== -1 ? filename.substring(lastDotIndex) : '';
+    const finalFilename = `${name}_${randomSuffix}${ext}`;
+
     try {
-        const blob = await put(filename, file, {
-            access: 'private' as any, // Cast to any to bypass type check if types are outdated
+        const blob = await put(finalFilename, file, {
+            access: 'public',
             token: process.env.BLOB_READ_WRITE_TOKEN,
         });
 

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         }
 
         const headers = new Headers(response.headers);
-        headers.set("Content-Disposition", `inline; filename="${file.name}"`);
+        headers.set("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`);
         headers.set("Content-Type", file.type);
         // Cache control for performance, but private
         headers.set("Cache-Control", "private, max-age=3600");
