@@ -16,7 +16,8 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
-    FileArchive
+    FileArchive,
+    FileText
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { ChatInterface } from "@/components/chat-interface";
 
 interface NoteViewProps {
     note: {
@@ -64,12 +66,6 @@ export function NoteView({ note }: NoteViewProps) {
     const [zoom, setZoom] = useState(100);
     const [title, setTitle] = useState(note.title || "Bez tytułu");
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [chatInput, setChatInput] = useState("");
-    const [messages, setMessages] = useState([
-        { role: "ai", content: "Cześć! Jestem Twoim asystentem AI. W czym mogę pomóc w związku z tą notatką?" }
-    ]);
-
-
     const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
     const files = note.files.length > 0
@@ -85,24 +81,6 @@ export function NoteView({ note }: NoteViewProps) {
 
     const handleZoomIn = () => setZoom((prev) => Math.min(prev + 10, 200));
     const handleZoomOut = () => setZoom((prev) => Math.max(prev - 10, 50));
-
-    const handleSendMessage = () => {
-        if (!chatInput.trim()) return;
-        setMessages([...messages, { role: "user", content: chatInput }]);
-        const currentInput = chatInput;
-        setChatInput("");
-        // Simulate AI response
-        setTimeout(() => {
-            setMessages((prev) => [...prev, { role: "ai", content: `To ciekawe pytanie o "${currentInput}"! Na podstawie notatki...` }]);
-        }, 1000);
-    };
-
-    const handlePredefinedQuestion = (question: string) => {
-        setMessages((prev) => [...prev, { role: "user", content: question }]);
-        setTimeout(() => {
-            setMessages((prev) => [...prev, { role: "ai", content: `Jasne, już odpowiadam na pytanie: "${question}".` }]);
-        }, 1000);
-    }
 
     const handlePrevFile = () => {
         setCurrentFileIndex((prev) => (prev > 0 ? prev - 1 : prev));
@@ -372,8 +350,11 @@ export function NoteView({ note }: NoteViewProps) {
 
                                 <TabsContent value="summary" className="flex-1 p-0 m-0 overflow-hidden">
                                     <div className="h-full bg-white dark:bg-zinc-900 border rounded-xl shadow-sm flex flex-col overflow-hidden">
-                                        <div className="border-b px-4 h-12 flex items-center bg-white dark:bg-zinc-900">
-                                            <h3 className="font-semibold text-sm">Podsumowanie</h3>
+                                        <div className="p-4 border-b dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur shrink-0">
+                                            <h1 className="text-lg font-semibold flex items-center gap-2">
+                                                <FileText className="w-5 h-5 text-blue-600" />
+                                                Podsumowanie
+                                            </h1>
                                         </div>
                                         <div className="flex-1 overflow-hidden">
                                             <ScrollArea className="h-full p-6">
@@ -392,65 +373,7 @@ export function NoteView({ note }: NoteViewProps) {
 
 
                                 <TabsContent value="chat" className="flex-1 p-0 m-0 overflow-hidden">
-                                    <div className="h-full bg-white dark:bg-zinc-900 border rounded-xl shadow-sm flex flex-col overflow-hidden">
-                                        <div className="border-b px-4 h-12 flex items-center bg-white dark:bg-zinc-900">
-                                            <h3 className="font-semibold text-sm">Asystent AI</h3>
-                                        </div>
-
-                                        <div className="flex-1 flex flex-col overflow-hidden">
-                                            <ScrollArea className="flex-1 p-4">
-                                                <div className="flex flex-col gap-4">
-                                                    {messages.map((msg, i) => (
-                                                        <div
-                                                            key={i}
-                                                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                                                        >
-                                                            <div
-                                                                className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === "user"
-                                                                    ? "bg-[#1E90FF] text-white rounded-br-sm"
-                                                                    : "bg-gray-100 dark:bg-zinc-800 text-foreground rounded-bl-sm"
-                                                                    }`}
-                                                            >
-                                                                {msg.content}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-
-                                            <div className="p-3 border-t bg-white dark:bg-zinc-900">
-                                                {/* Suggested Questions */}
-                                                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Zrób test")}>
-                                                        Zrób test
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Wyjaśnij pojęcia")}>
-                                                        Wyjaśnij pojęcia
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs rounded-full whitespace-nowrap bg-transparent" onClick={() => handlePredefinedQuestion("Streść")}>
-                                                        Streść
-                                                    </Button>
-                                                </div>
-
-                                                <div className="relative">
-                                                    <Input
-                                                        placeholder="Zapytaj o cokolwiek..."
-                                                        value={chatInput}
-                                                        onChange={(e) => setChatInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                                                        className="pr-10 rounded-full bg-gray-50 dark:bg-zinc-800 border-transparent focus:bg-white focus:border-[#1E90FF] transition-all"
-                                                    />
-                                                    <Button
-                                                        size="icon"
-                                                        onClick={handleSendMessage}
-                                                        className="absolute right-1 top-1 h-8 w-8 rounded-full bg-[#1E90FF] hover:bg-blue-600 text-white"
-                                                    >
-                                                        <Send className="w-3.5 h-3.5" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <ChatInterface note={note} />
                                 </TabsContent>
                             </Tabs>
                         </div>

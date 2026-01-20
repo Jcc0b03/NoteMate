@@ -88,7 +88,7 @@ export default async function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {notes.map((note) => {
+                    {notes.map((note: any) => {
                         const subjectName = note.subject?.name || (note.tags.length > 0 ? note.tags[0] : "Inne");
                         const colorMap: Record<string, string> = {
                             "matematyka": "blue",
