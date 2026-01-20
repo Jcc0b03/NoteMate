@@ -19,11 +19,18 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Upload to Vercel Blob with the specific path structure
-    // path: handoff-<sessionId>/filename
-    const blob = await put(`handoff-${sessionId}/${file.name}`, file, {
-        access: 'public',
-    });
+    try {
+        // path: handoff-<sessionId>/filename
+        // Add timestamp to filename to avoid collisions
+        const uniqueName = `${Date.now()}-${file.name}`;
 
-    return NextResponse.json(blob);
+        const blob = await put(`handoff-${sessionId}/${uniqueName}`, file, {
+            access: 'public',
+        });
+
+        return NextResponse.json(blob);
+    } catch (error) {
+        console.error("Upload error:", error);
+        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+    }
 }
