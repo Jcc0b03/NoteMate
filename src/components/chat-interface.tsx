@@ -7,15 +7,18 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+// ... imports ...
+
 interface ChatInterfaceProps {
     note: {
         id: string;
         title: string | null;
         files: any[];
     };
+    readOnly?: boolean;
 }
 
-export function ChatInterface({ note }: ChatInterfaceProps) {
+export function ChatInterface({ note, readOnly = false }: ChatInterfaceProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [input, setInput] = useState('');
 
@@ -148,24 +151,32 @@ export function ChatInterface({ note }: ChatInterfaceProps) {
             </div>
 
             {/* Input */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border-t dark:border-zinc-800 shrink-0">
-                <form onSubmit={handleSubmit} className="flex gap-2 relative">
-                    <input
-                        className="flex-1 p-3 pl-4 pr-12 rounded-xl border dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-zinc-400"
-                        value={input}
-                        onChange={handleInputChange}
-                        placeholder="Napisz wiadomość..."
-                        disabled={isLoading}
-                    />
-                    <button
-                        type="submit"
-                        disabled={isLoading || !input.trim()}
-                        className="absolute right-2 top-1.5 p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors"
-                    >
-                        <Send className="w-4 h-4" />
-                    </button>
-                </form>
-            </div>
+            {!readOnly ? (
+                <div className="p-4 bg-white dark:bg-zinc-950 border-t dark:border-zinc-800 shrink-0">
+                    <form onSubmit={handleSubmit} className="flex gap-2 relative">
+                        <input
+                            className="flex-1 p-3 pl-4 pr-12 rounded-xl border dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-zinc-400"
+                            value={input}
+                            onChange={handleInputChange}
+                            placeholder="Napisz wiadomość..."
+                            disabled={isLoading}
+                        />
+                        <button
+                            type="submit"
+                            disabled={isLoading || !input.trim()}
+                            className="absolute right-2 top-1.5 p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors"
+                        >
+                            <Send className="w-4 h-4" />
+                        </button>
+                    </form>
+                </div>
+            ) : (
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border-t dark:border-zinc-800 shrink-0">
+                    <p className="text-center text-sm text-muted-foreground">
+                        Możliwość pisania jest zablokowana w trybie podglądu.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

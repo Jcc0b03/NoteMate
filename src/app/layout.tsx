@@ -18,6 +18,14 @@ const notoColorEmoji = Noto_Color_Emoji({
 export const metadata: Metadata = {
   title: "NoteMate",
   description: "Your modern note-taking dashboard",
+  metadataBase: new URL("https://notemate.pl"), // Replace with your actual domain or Vercel URL
+  openGraph: {
+    title: "NoteMate",
+    description: "Your modern note-taking dashboard",
+    siteName: "NoteMate",
+    locale: "pl_PL",
+    type: "website",
+  }
 };
 
 export default function RootLayout({

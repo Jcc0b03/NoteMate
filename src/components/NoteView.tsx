@@ -17,9 +17,11 @@ import {
     ChevronLeft,
     ChevronRight,
     FileArchive,
-    FileText
+    FileText,
+    LayoutDashboard
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 // import { Textarea } from "@/components/ui/textarea"; // Removed
@@ -37,7 +39,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { updateNoteTitle, deleteNote } from "@/actions/note";
+import { updateNoteTitle, deleteNote, cloneNote } from "@/actions/note";
+import { ShareButton } from "@/components/ShareButton";
 import {
     Dialog,
     DialogContent,
@@ -57,10 +60,16 @@ interface NoteViewProps {
         summary: string | null;
         createdAt: Date;
         files: { id: string; url: string; name: string }[];
+        isShared: boolean;
+        shareToken: string | null;
+        viewCount: number;
+        isPublicEditable?: boolean;
     };
+    readOnly?: boolean;
+    isOwner?: boolean;
 }
 
-export function NoteView({ note }: NoteViewProps) {
+export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewProps) {
     const router = useRouter();
     const isMobile = useIsMobile();
     const [zoom, setZoom] = useState(100);
@@ -92,7 +101,19 @@ export function NoteView({ note }: NoteViewProps) {
 
     const [isDeleting, setIsDeleting] = useState(false);
     const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+    const [isCloning, setIsCloning] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+    const handleCloneNote = async () => {
+        setIsCloning(true);
+        const result = await cloneNote(note.id);
+        if (result.success && result.noteId) {
+            router.push(`/notes/${result.noteId}`);
+        } else {
+            console.error("Failed to clone note:", result.error);
+            setIsCloning(false);
+        }
+    };
 
     const handleDeleteNote = async () => {
         setIsDeleting(true);
@@ -125,12 +146,13 @@ export function NoteView({ note }: NoteViewProps) {
             {/* Header */}
             <header className="border-b p-4 flex justify-between items-center bg-card">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+                    <Button variant="ghost" size="icon" onClick={() => router.push("/app")} className="text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
+
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2 h-8">
-                            {isEditingTitle ? (
+                            {isEditingTitle && !readOnly ? (
                                 <div className="flex items-center gap-1">
                                     <Input
                                         value={title}
@@ -150,29 +172,59 @@ export function NoteView({ note }: NoteViewProps) {
                                     <h1 className="text-xl md:text-2xl font-bold text-foreground truncate max-w-[200px] md:max-w-md">
                                         {title}
                                     </h1>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-muted-foreground hover:text-primary"
-                                        onClick={() => setIsEditingTitle(true)}
-                                    >
-                                        <Edit2 className="w-3 h-3" />
-                                    </Button>
+                                    {!readOnly && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                            onClick={() => setIsEditingTitle(true)}
+                                        >
+                                            <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                    )}
                                 </>
                             )}
                         </div>
                         <span className="text-xs md:text-sm text-muted-foreground mt-1">
-                            Dodano {new Date(note.createdAt).toLocaleDateString('pl-PL')}
+                            {readOnly ? (
+                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-100 font-medium">
+                                    Tryb podglądu
+                                </span>
+                            ) : (
+                                `Dodano ${new Date(note.createdAt).toLocaleDateString('pl-PL')}`
+                            )}
                         </span>
+                        <div className="flex items-center text-xs text-muted-foreground ml-4 gap-1 bg-muted/50 px-2 py-1 rounded-md">
+                            <span className="font-semibold text-foreground">{note.viewCount}</span>
+                            <span>wyświetleń</span>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button className="bg-[#1E90FF] hover:bg-blue-600 text-white gap-2 hidden md:flex">
-                        <Share2 className="w-4 h-4" /> Udostępnij
-                    </Button>
-                    <Button className="bg-[#1E90FF] hover:bg-blue-600 text-white md:hidden size-9 p-0">
-                        <Share2 className="w-4 h-4" />
-                    </Button>
+                    {/* 
+                        Bug Fix: Share button only for OWNER.
+                        Bug Fix: Duplicate button for anyone who is NOT OWNER.
+                    */}
+
+                    {isOwner ? (
+                        <ShareButton
+                            noteId={note.id}
+                            initialIsShared={note.isShared}
+                            initialShareToken={note.shareToken}
+                            initialIsPublicEditable={note.isPublicEditable}
+                        />
+                    ) : (
+                        <Button
+                            className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                            onClick={handleCloneNote}
+                            disabled={isCloning}
+                        >
+                            {isCloning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                            <span className="hidden md:inline">Zapisz u siebie</span>
+                            <span className="md:hidden">Zapisz</span>
+                        </Button>
+                    )}
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -180,12 +232,15 @@ export function NoteView({ note }: NoteViewProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                className="text-destructive focus:text-destructive cursor-pointer"
-                                onClick={() => setShowDeleteDialog(true)}
-                            >
-                                <Trash2 className="w-4 h-4 mr-2" /> Usuń notatkę
-                            </DropdownMenuItem>
+                            {/* Delete only for Owner + Not ReadOnly */}
+                            {isOwner && !readOnly && (
+                                <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                    onClick={() => setShowDeleteDialog(true)}
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" /> Usuń notatkę
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => {
                                 if (!note.summary) return;
                                 const blob = new Blob([note.summary], { type: "text/plain" });
@@ -373,7 +428,7 @@ export function NoteView({ note }: NoteViewProps) {
 
 
                                 <TabsContent value="chat" className="flex-1 p-0 m-0 overflow-hidden">
-                                    <ChatInterface note={note} />
+                                    <ChatInterface note={note} readOnly={readOnly} />
                                 </TabsContent>
                             </Tabs>
                         </div>
