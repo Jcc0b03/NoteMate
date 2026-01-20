@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
         const note = file.note;
         const isOwner = note.userId === user.id;
-        const isShared = note.sharedWith.includes(user.id);
+        const isShared = note.isShared || note.sharedWith.includes(user.id);
 
         if (!isOwner && !isShared) {
             return new NextResponse("Forbidden", { status: 403 });

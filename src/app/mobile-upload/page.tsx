@@ -241,12 +241,6 @@ function MobileUploadContent() {
                 <p className="text-lg text-gray-600 mb-8">
                     Przesłano pomyślnie {uploadCount} {uploadCount === 1 ? 'zdjęcie' : (uploadCount > 1 && uploadCount < 5) ? 'zdjęcia' : 'zdjęć'} na Twój komputer.
                 </p>
-                <button
-                    onClick={() => setStagedFiles([])}
-                    className="px-8 py-3 bg-white text-green-700 font-bold rounded-full border border-green-200 shadow-sm hover:bg-green-50 transition-colors uppercase tracking-wide text-sm"
-                >
-                    Wyślij więcej
-                </button>
             </div>
         );
     }

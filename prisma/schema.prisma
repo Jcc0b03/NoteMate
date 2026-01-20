@@ -25,6 +25,12 @@ model Note {
   tags        String[]
   sharedWith  String[]    // IDs of users this note is shared with
 
+  // Sharing logic
+  isShared    Boolean     @default(false)
+  shareToken  String?     @unique
+  viewCount   Int         @default(0)
+  isPublicEditable Boolean @default(false)
+
   // Dane wygenerowane przez AI
   content     String?     @db.Text // Pełna transkrypcja (OCR)
   summary     String?     @db.Text // Krótkie podsumowanie

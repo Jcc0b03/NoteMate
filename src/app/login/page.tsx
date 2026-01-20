@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSignIn } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
 
@@ -23,6 +23,8 @@ export default function LoginPage() {
     const [password, setPassword] = React.useState("");
     const [error, setError] = React.useState("");
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirectUrl = searchParams.get("redirect_url") || "/app";
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,7 +38,7 @@ export default function LoginPage() {
 
             if (signInAttempt.status === "complete") {
                 await setActive({ session: signInAttempt.createdSessionId });
-                router.push("/app");
+                router.push(redirectUrl);
             } else {
                 console.error(JSON.stringify(signInAttempt, null, 2));
             }
@@ -117,7 +119,7 @@ export default function LoginPage() {
                                 onClick={() => signIn?.authenticateWithRedirect({
                                     strategy: "oauth_google",
                                     redirectUrl: "/sso-callback",
-                                    redirectUrlComplete: "/app"
+                                    redirectUrlComplete: redirectUrl
                                 })}
                             >
                                 <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">

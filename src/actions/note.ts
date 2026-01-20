@@ -136,3 +136,74 @@ export async function deleteNote(noteId: string) {
         return { success: false, error: "Failed to delete note" };
     }
 }
+
+export async function cloneNote(noteId: string) {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized");
+
+    try {
+        const sourceNote = await prisma.note.findUnique({
+            where: { id: noteId },
+            include: {
+                files: true,
+                subject: true,
+            },
+        });
+
+        if (!sourceNote) return { success: false, error: "Note not found" };
+
+        // Ensure user has access (is owner or note is shared)
+        const hasAccess = sourceNote.userId === user.id || sourceNote.isShared || sourceNote.sharedWith.includes(user.id);
+        if (!hasAccess) return { success: false, error: "Unauthorized" };
+
+        let subjectId = sourceNote.subjectId;
+
+        // If subject exists, try to find matching subject for current user or create new
+        if (sourceNote.subject) {
+            const userSubject = await prisma.subject.upsert({
+                where: {
+                    userId_name: {
+                        userId: user.id,
+                        name: sourceNote.subject.name,
+                    },
+                },
+                update: {},
+                create: {
+                    userId: user.id,
+                    name: sourceNote.subject.name,
+                },
+            });
+            subjectId = userSubject.id;
+        }
+
+        const newNote = await prisma.note.create({
+            data: {
+                userId: user.id,
+                title: `${sourceNote.title} (Kopia)`,
+                subjectId: subjectId,
+                tags: sourceNote.tags,
+                content: sourceNote.content,
+                summary: sourceNote.summary,
+                imageUrl: sourceNote.imageUrl,
+                status: sourceNote.status,
+                files: {
+                    create: sourceNote.files.map(f => ({
+                        url: f.url,
+                        name: f.name,
+                        type: f.type,
+                        size: f.size,
+                        sourceName: f.sourceName
+                    }))
+                }
+            },
+        });
+
+        revalidatePath("/app");
+        return { success: true, noteId: newNote.id };
+    } catch (error) {
+        console.error("Clone error:", error);
+        return { success: false, error: "Failed to clone note" };
+    }
+}
+
+
