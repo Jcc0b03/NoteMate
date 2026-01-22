@@ -43,7 +43,10 @@ export default async function SharePage({ params }: SharePageProps) {
     // 1. Fetch note
     const note = await prisma.note.findUnique({
         where: { shareToken: token },
-        include: { files: true },
+        include: {
+            files: true,
+            subject: true,
+        },
     });
 
     // 2. Validate existence and share status

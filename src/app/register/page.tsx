@@ -34,7 +34,7 @@ export default function RegisterPage() {
         if (!isLoaded) return;
 
         if (password !== confirmPassword) {
-            setError("Passwords do not match");
+            setError("Hasła nie są identyczne");
             return;
         }
 
@@ -50,7 +50,7 @@ export default function RegisterPage() {
             setVerifying(true);
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Something went wrong");
+            setError(err.errors?.[0]?.message || "Coś poszło nie tak");
         }
     };
 
@@ -71,7 +71,7 @@ export default function RegisterPage() {
             }
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Invalid verification code");
+            setError(err.errors?.[0]?.message || "Nieprawidłowy kod weryfikacyjny");
         }
     };
 
@@ -80,26 +80,26 @@ export default function RegisterPage() {
             <div className="flex min-h-screen items-center justify-center bg-muted/50 px-4 py-12 sm:px-6 lg:px-8">
                 <Card className="w-full max-w-md">
                     <CardHeader>
-                        <CardTitle>Verify your email</CardTitle>
+                        <CardTitle>Zweryfikuj swój email</CardTitle>
                         <CardDescription>
-                            We sent a code to {email}
+                            Wysłaliśmy kod na adres {email}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleVerify} className="grid gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="code">Verification Code</Label>
+                                <Label htmlFor="code">Kod weryfikacyjny</Label>
                                 <Input
                                     id="code"
                                     value={code}
                                     onChange={(e) => setCode(e.target.value)}
-                                    placeholder="Enter verification code"
+                                    placeholder="Wpisz kod weryfikacyjny"
                                     required
                                 />
                             </div>
                             {error && <p className="text-destructive text-sm">{error}</p>}
                             <Button type="submit" className="w-full">
-                                Verify Email
+                                Zweryfikuj email
                             </Button>
                         </form>
                     </CardContent>
@@ -115,37 +115,37 @@ export default function RegisterPage() {
                     <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
                         <BookOpen className="size-6" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight">Create an account</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Utwórz konto</h1>
                     <p className="text-muted-foreground mt-2">
-                        Enter your information to get started
+                        Wpisz swoje dane, aby rozpocząć
                     </p>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Sign Up</CardTitle>
+                        <CardTitle>Rejestracja</CardTitle>
                         <CardDescription>
-                            Create a new account to start organizing your notes
+                            Utwórz nowe konto, aby zacząć organizować notatki
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="grid gap-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="first-name">First name</Label>
+                                    <Label htmlFor="first-name">Imię</Label>
                                     <Input
                                         id="first-name"
-                                        placeholder="Max"
+                                        placeholder="Jan"
                                         value={firstName}
                                         onChange={(e) => setFirstName(e.target.value)}
                                         required
                                     />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="last-name">Last name</Label>
+                                    <Label htmlFor="last-name">Nazwisko</Label>
                                     <Input
                                         id="last-name"
-                                        placeholder="Robinson"
+                                        placeholder="Kowalski"
                                         value={lastName}
                                         onChange={(e) => setLastName(e.target.value)}
                                         required
@@ -157,14 +157,14 @@ export default function RegisterPage() {
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="m@example.com"
+                                    placeholder="jan@przyklad.pl"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                 />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="password">Password</Label>
+                                <Label htmlFor="password">Hasło</Label>
                                 <Input
                                     id="password"
                                     type="password"
@@ -174,7 +174,7 @@ export default function RegisterPage() {
                                 />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="confirm-password">Confirm Password</Label>
+                                <Label htmlFor="confirm-password">Potwierdź hasło</Label>
                                 <Input
                                     id="confirm-password"
                                     type="password"
@@ -186,13 +186,13 @@ export default function RegisterPage() {
                             {error && <p className="text-destructive text-sm">{error}</p>}
                             <div id="clerk-captcha"></div>
                             <Button type="submit" className="w-full">
-                                Create an account
+                                Utwórz konto
                             </Button>
                         </form>
                         <div className="mt-4 text-center text-sm">
-                            Already have an account?{" "}
+                            Masz już konto?{" "}
                             <Link href="/login" className="underline text-primary">
-                                Sign in
+                                Zaloguj się
                             </Link>
                         </div>
                     </CardContent>

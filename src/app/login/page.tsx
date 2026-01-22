@@ -22,6 +22,8 @@ export default function LoginPage() {
     const [email, setEmail] = React.useState("");
     const [password, setPassword] = React.useState("");
     const [error, setError] = React.useState("");
+    const [verifying, setVerifying] = React.useState(false);
+    const [code, setCode] = React.useState("");
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectUrl = searchParams.get("redirect_url") || "/app";
@@ -39,14 +41,90 @@ export default function LoginPage() {
             if (signInAttempt.status === "complete") {
                 await setActive({ session: signInAttempt.createdSessionId });
                 router.push(redirectUrl);
+            } else if (signInAttempt.status === "needs_first_factor" || signInAttempt.status === "needs_second_factor") {
+                // Check if email_code is a supported strategy
+                const emailCodeFactor = signInAttempt.supportedFirstFactors?.find(
+                    (factor) => factor.strategy === "email_code"
+                ) || signInAttempt.supportedSecondFactors?.find(
+                    (factor) => factor.strategy === "email_code"
+                );
+
+                if (emailCodeFactor) {
+                    const { emailAddressId } = emailCodeFactor as any;
+                    await signIn.prepareFirstFactor({
+                        strategy: "email_code",
+                        emailAddressId,
+                    });
+                    setVerifying(true);
+                } else {
+                    console.error("Email code strategy not supported for this user", signInAttempt);
+                    setError("Weryfikacja email nie jest dostępna dla tego konta.");
+                }
             } else {
                 console.error(JSON.stringify(signInAttempt, null, 2));
+                setError("Nieznany status logowania");
             }
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Something went wrong");
+            setError(err.errors?.[0]?.message || "Coś poszło nie tak");
         }
     };
+
+    const handleVerify = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!isLoaded) return;
+
+        try {
+            const completeSignIn = await signIn.attemptFirstFactor({
+                strategy: "email_code",
+                code,
+            });
+
+            if (completeSignIn.status === "complete") {
+                await setActive({ session: completeSignIn.createdSessionId });
+                router.push(redirectUrl);
+            } else {
+                console.error(JSON.stringify(completeSignIn, null, 2));
+                setError("Nie udało się zweryfikować kodu.");
+            }
+        } catch (err: any) {
+            console.error(JSON.stringify(err, null, 2));
+            setError(err.errors?.[0]?.message || "Nieprawidłowy kod weryfikacyjny");
+        }
+    };
+
+    if (verifying) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-muted/50 px-4 py-12 sm:px-6 lg:px-8">
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <CardTitle>Zweryfikuj swój email</CardTitle>
+                        <CardDescription>
+                            Wysłaliśmy kod na adres {email}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleVerify} className="grid gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="code">Kod weryfikacyjny</Label>
+                                <Input
+                                    id="code"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value)}
+                                    placeholder="Wpisz kod weryfikacyjny"
+                                    required
+                                />
+                            </div>
+                            {error && <p className="text-destructive text-sm">{error}</p>}
+                            <Button type="submit" className="w-full">
+                                Zweryfikuj email
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted/50 px-4 py-12 sm:px-6 lg:px-8">
@@ -55,17 +133,17 @@ export default function LoginPage() {
                     <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
                         <BookOpen className="size-6" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Witaj ponownie</h1>
                     <p className="text-muted-foreground mt-2">
-                        Sign in to your account
+                        Zaloguj się do swojego konta
                     </p>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Login</CardTitle>
+                        <CardTitle>Logowanie</CardTitle>
                         <CardDescription>
-                            Enter your email below to login to your account
+                            Wpisz swój email poniżej, aby się zalogować
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -83,9 +161,9 @@ export default function LoginPage() {
                             </div>
                             <div className="grid gap-2">
                                 <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
+                                    <Label htmlFor="password">Hasło</Label>
                                     <Link href="#" className="ml-auto inline-block text-sm underline">
-                                        Forgot your password?
+                                        Nie pamiętasz hasła?
                                     </Link>
                                 </div>
                                 <Input
@@ -98,7 +176,7 @@ export default function LoginPage() {
                             </div>
                             {error && <p className="text-destructive text-sm">{error}</p>}
                             <Button type="submit" className="w-full">
-                                Login
+                                Zaloguj się
                             </Button>
 
                             <div className="relative">
@@ -107,7 +185,7 @@ export default function LoginPage() {
                                 </div>
                                 <div className="relative flex justify-center text-xs uppercase">
                                     <span className="bg-background px-2 text-muted-foreground">
-                                        Or continue with
+                                        Lub kontynuuj przez
                                     </span>
                                 </div>
                             </div>
@@ -129,9 +207,9 @@ export default function LoginPage() {
                             </Button>
                         </form>
                         <div className="mt-4 text-center text-sm">
-                            Don&apos;t have an account?{" "}
+                            Nie masz konta?{" "}
                             <Link href="/register" className="underline text-primary">
-                                Sign up
+                                Zarejestruj się
                             </Link>
                         </div>
                     </CardContent>

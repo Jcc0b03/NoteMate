@@ -206,4 +206,103 @@ export async function cloneNote(noteId: string) {
     }
 }
 
+export async function updateNoteDetails(noteId: string, data: {
+    title: string;
+    subjectName: string;
+    tags: string[];
+}) {
+    const user = await currentUser();
+
+    if (!user) {
+        throw new Error("Unauthorized");
+    }
+
+    const { title, subjectName, tags } = data;
+
+    // 1. Find or create Subject
+    let subjectId: string | undefined;
+
+    if (subjectName) {
+        const subject = await prisma.subject.upsert({
+            where: {
+                userId_name: {
+                    userId: user.id,
+                    name: subjectName,
+                },
+            },
+            update: {},
+            create: {
+                userId: user.id,
+                name: subjectName,
+            },
+        });
+        subjectId = subject.id;
+    }
+
+    try {
+        await prisma.note.update({
+            where: {
+                id: noteId,
+                userId: user.id,
+            },
+            data: {
+                title,
+                subjectId,
+                tags,
+            },
+        });
+
+        revalidatePath(`/notes/${noteId}`);
+        revalidatePath("/app");
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating note details:", error);
+        return { success: false, error: "Failed to update note details" };
+    }
+}
+
+export async function addNoteFiles(noteId: string, files: { url: string; name: string; type: string; size: number }[]) {
+    const user = await currentUser();
+
+    if (!user) {
+        throw new Error("Unauthorized");
+    }
+
+    try {
+        const note = await prisma.note.findUnique({
+            where: { id: noteId },
+            select: { userId: true, isShared: true, isPublicEditable: true }
+        });
+
+        if (!note) throw new Error("Note not found");
+
+        const canEdit = note.userId === user.id || (note.isShared && note.isPublicEditable);
+
+        if (!canEdit) {
+            throw new Error("Unauthorized");
+        }
+
+        await prisma.note.update({
+            where: { id: noteId },
+            data: {
+                files: {
+                    create: files.map((f) => ({
+                        url: f.url,
+                        name: f.name,
+                        sourceName: f.name,
+                        type: f.type,
+                        size: f.size,
+                    })),
+                },
+            },
+        });
+
+        revalidatePath(`/notes/${noteId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Error adding files:", error);
+        return { success: false, error: "Failed to add files" };
+    }
+}
+
 

@@ -108,6 +108,8 @@ export default async function Dashboard() {
                                     tag={subjectName}
                                     color={color}
                                     status={note.status}
+                                    tags={note.tags}
+                                    subjectName={note.subject?.name}
                                 />
                             </Link>
                         );

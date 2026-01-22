@@ -18,7 +18,8 @@ import {
     ChevronRight,
     FileArchive,
     FileText,
-    LayoutDashboard
+    LayoutDashboard,
+    Upload
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -37,9 +38,10 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { updateNoteTitle, deleteNote, cloneNote } from "@/actions/note";
+import { updateNoteTitle, deleteNote, cloneNote, updateNoteDetails, addNoteFiles } from "@/actions/note";
 import { ShareButton } from "@/components/ShareButton";
 import {
     Dialog,
@@ -51,6 +53,8 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { ChatInterface } from "@/components/chat-interface";
+import { NoteSettingsForm } from "./NoteSettingsForm";
+import { NoteFileUpload, FileUpload } from "./NoteFileUpload";
 
 interface NoteViewProps {
     note: {
@@ -64,6 +68,8 @@ interface NoteViewProps {
         shareToken: string | null;
         viewCount: number;
         isPublicEditable?: boolean;
+        subject?: { name: string } | null;
+        tags: string[];
     };
     readOnly?: boolean;
     isOwner?: boolean;
@@ -104,6 +110,20 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
     const [isCloning, setIsCloning] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+    // Edit Modal State
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [editTitle, setEditTitle] = useState(note.title || "Bez tytułu");
+    const [editSubject, setEditSubject] = useState(note.subject?.name || "");
+    const [editTags, setEditTags] = useState<string[]>(note.tags || []);
+    const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+    // Upload Modal State
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [newFiles, setNewFiles] = useState<FileUpload[]>([]);
+    const [isSavingFiles, setIsSavingFiles] = useState(false);
+
+    const canEdit = isOwner || (!readOnly && note.isPublicEditable);
+
     const handleCloneNote = async () => {
         setIsCloning(true);
         const result = await cloneNote(note.id);
@@ -138,6 +158,57 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
         if (!result.success) {
             console.error("Failed to update title:", result.error);
             // Optionally revert title or show toast
+        }
+    };
+
+    const handleSaveDetails = async () => {
+        setIsSavingDetails(true);
+        try {
+            const result = await updateNoteDetails(note.id, {
+                title: editTitle,
+                subjectName: editSubject,
+                tags: editTags
+            });
+
+            if (result.success) {
+                setIsEditOpen(false);
+                setTitle(editTitle); // Local update
+                // Router refresh is handled in action revalidatePath, 
+                // but local state update provides immediate feedback for title.
+            } else {
+                console.error("Failed to update details:", result.error);
+            }
+        } catch (error) {
+            console.error("Error saving details:", error);
+        } finally {
+            setIsSavingDetails(false);
+        }
+    };
+
+    const handleSaveFiles = async () => {
+        // Filter only complete files
+        const filesToSave = newFiles.filter(f => f.status === 'complete').map(f => ({
+            url: f.url!,
+            name: f.file.name,
+            type: f.file.type || 'unknown',
+            size: f.file.size
+        }));
+
+        if (filesToSave.length === 0) return;
+
+        setIsSavingFiles(true);
+        try {
+            const result = await addNoteFiles(note.id, filesToSave);
+            if (result.success) {
+                setIsUploadOpen(false);
+                setNewFiles([]);
+            } else {
+                console.error("Failed to add files:", result.error);
+            }
+        } catch (error) {
+            console.error("Error adding files:", error);
+        } finally {
+            setIsSavingFiles(false);
         }
     };
 
@@ -201,10 +272,18 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* 
-                        Bug Fix: Share button only for OWNER.
-                        Bug Fix: Duplicate button for anyone who is NOT OWNER.
-                    */}
+
+                    {/* Add Files Button - Only if can Edit */}
+                    {canEdit && (
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsUploadOpen(true)}
+                            title="Dodaj pliki"
+                        >
+                            <Upload className="size-4" />
+                        </Button>
+                    )}
 
                     {isOwner ? (
                         <ShareButton
@@ -232,15 +311,13 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            {/* Delete only for Owner + Not ReadOnly */}
-                            {isOwner && !readOnly && (
-                                <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive cursor-pointer"
-                                    onClick={() => setShowDeleteDialog(true)}
-                                >
-                                    <Trash2 className="w-4 h-4 mr-2" /> Usuń notatkę
+                            {/* Edit Option - Only if can Edit */}
+                            {canEdit && (
+                                <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                                    <Edit2 className="w-4 h-4 mr-2" /> Edytuj szczegóły
                                 </DropdownMenuItem>
                             )}
+
                             <DropdownMenuItem onClick={() => {
                                 if (!note.summary) return;
                                 const blob = new Blob([note.summary], { type: "text/plain" });
@@ -302,6 +379,19 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                                 )}
                                 {isDownloadingZip ? "Pobieranie..." : "Pobierz pliki jako ZIP"}
                             </DropdownMenuItem>
+
+                            {/* Delete only for Owner + Not ReadOnly */}
+                            {isOwner && !readOnly && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive cursor-pointer"
+                                        onClick={() => setShowDeleteDialog(true)}
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" /> Usuń notatkę
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -435,6 +525,69 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
+
+            {/* Note Edit Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edytuj notatkę</DialogTitle>
+                        <DialogDescription>
+                            Zmień tytuł, przedmiot lub tagi.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <NoteSettingsForm
+                        title={editTitle}
+                        setTitle={setEditTitle}
+                        subjectValue={editSubject}
+                        setSubjectValue={setEditSubject}
+                        tags={editTags}
+                        setTags={setEditTags}
+                    />
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                            Anuluj
+                        </Button>
+                        <Button onClick={handleSaveDetails} disabled={isSavingDetails}>
+                            {isSavingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Zapisz
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add Files Dialog */}
+            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Dodaj pliki</DialogTitle>
+                        <DialogDescription>
+                            Prześlij dodatkowe pliki do tej notatki.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto">
+                        <NoteFileUpload
+                            files={newFiles}
+                            setFiles={setNewFiles}
+                        />
+                    </div>
+
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsUploadOpen(false)}>
+                            Anuluj
+                        </Button>
+                        <Button
+                            onClick={handleSaveFiles}
+                            disabled={isSavingFiles || newFiles.length === 0 || newFiles.some(f => f.status === 'uploading')}
+                        >
+                            {isSavingFiles && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Dodaj pliki
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <DialogContent>

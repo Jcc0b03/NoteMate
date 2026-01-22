@@ -19,6 +19,7 @@ export default async function NotePage({ params }: PageProps) {
         where: { id },
         include: {
             files: true,
+            subject: true,
         },
     });
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Sparkles, Share2, Loader2, AlertCircle, MoreVertical, Trash2 } from "lucide-react";
+import { MessageSquare, Sparkles, Share2, Loader2, AlertCircle, MoreVertical, Trash2, Edit2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,14 +19,29 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteNote } from "@/actions/note";
+import { deleteNote, updateNoteDetails } from "@/actions/note";
+import { NoteSettingsForm } from "./NoteSettingsForm";
 
-export function NoteCard({ id, title, preview, date, tag, color, status }: { id: string; title: string; preview: string; date: string; tag: string; color: string; status: "PROCESSING" | "COMPLETED" | "FAILED" }) {
+export function NoteCard({ id, title, preview, date, tag, color, status, tags = [], subjectName }: { id: string; title: string; preview: string; date: string; tag: string; color: string; status: "PROCESSING" | "COMPLETED" | "FAILED", tags?: string[], subjectName?: string }) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-    // Color mapping for the left border and tag
+    // Edit State
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [editTitle, setEditTitle] = useState(title);
+    const [editSubject, setEditSubject] = useState(subjectName || "");
+    const [editTags, setEditTags] = useState<string[]>(tags);
+    const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+    // Update local state when props change (optional, but good practice if list refreshes)
+    // useEffect(() => {
+    //     setEditTitle(title);
+    //     setEditSubject(subjectName || "");
+    //     setEditTags(tags);
+    // }, [title, subjectName, tags]);
+
+
     const colorStyles: Record<string, { border: string; bg: string; text: string }> = {
         blue: { border: "bg-blue-500", bg: "bg-blue-100", text: "text-blue-700" },
         green: { border: "bg-green-500", bg: "bg-green-100", text: "text-green-700" },
@@ -61,6 +76,31 @@ export function NoteCard({ id, title, preview, date, tag, color, status }: { id:
         }
     };
 
+    const handleSaveDetails = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        setIsSavingDetails(true);
+        try {
+            const result = await updateNoteDetails(id, {
+                title: editTitle,
+                subjectName: editSubject,
+                tags: editTags
+            });
+
+            if (result.success) {
+                setIsEditOpen(false);
+                router.refresh();
+            } else {
+                console.error("Failed to update details:", result.error);
+            }
+        } catch (error) {
+            console.error("Error saving details:", error);
+        } finally {
+            setIsSavingDetails(false);
+        }
+    };
+
     return (
         <>
             <div className="relative group rounded-3xl bg-card shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-border">
@@ -76,6 +116,18 @@ export function NoteCard({ id, title, preview, date, tag, color, status }: { id:
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditTitle(title);
+                                    setEditSubject(subjectName || "");
+                                    setEditTags(tags);
+                                    setIsEditOpen(true);
+                                }}
+                            >
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Edytuj
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive cursor-pointer"
                                 onClick={(e) => {
@@ -148,6 +200,38 @@ export function NoteCard({ id, title, preview, date, tag, color, status }: { id:
                     </div>
                 </div>
             </div>
+
+            <Dialog open={isEditOpen} onOpenChange={(open) => {
+                if (!open) setIsEditOpen(false);
+            }}>
+                <DialogContent onClick={(e) => e.stopPropagation()} className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edytuj notatkę</DialogTitle>
+                        <DialogDescription>
+                            Zmień tytuł, przedmiot lub tagi.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <NoteSettingsForm
+                        title={editTitle}
+                        setTitle={setEditTitle}
+                        subjectValue={editSubject}
+                        setSubjectValue={setEditSubject}
+                        tags={editTags}
+                        setTags={setEditTags}
+                    />
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={(e) => { e.stopPropagation(); setIsEditOpen(false); }}>
+                            Anuluj
+                        </Button>
+                        <Button onClick={handleSaveDetails} disabled={isSavingDetails}>
+                            {isSavingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Zapisz
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <DialogContent onClick={(e) => e.stopPropagation()}>
