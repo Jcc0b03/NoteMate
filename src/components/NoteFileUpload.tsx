@@ -57,7 +57,7 @@ export function NoteFileUpload({ files, setFiles }: NoteFileUploadProps) {
 
         setFiles(prev => [...prev, ...newFiles]);
 
-        for (const fileUpload of newFiles) {
+        await Promise.all(newFiles.map(async (fileUpload) => {
             try {
                 const filename = fileUpload.file.name;
                 const formData = new FormData();
@@ -98,7 +98,7 @@ export function NoteFileUpload({ files, setFiles }: NoteFileUploadProps) {
                     return f;
                 }));
             }
-        }
+        }));
     }, [setFiles]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
