@@ -31,11 +31,12 @@ export default async function NotePage({ params }: PageProps) {
     const isOwner = note.userId === user.id;
     const isShared = note.sharedWith.includes(user.id);
     const isPubliclyShared = note.isShared;
+    const canEditSharedNote = isShared || (isPubliclyShared && note.isPublicEditable);
 
     if (!isOwner && !isShared && !isPubliclyShared) {
         // You might want to show a specialized 403 page
         notFound(); // Hiding existance for now
     }
 
-    return <NoteView note={note} isOwner={isOwner} />;
+    return <NoteView note={note} isOwner={isOwner} readOnly={!isOwner && !canEditSharedNote} />;
 }
