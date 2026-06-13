@@ -1,10 +1,7 @@
-import Link from "next/link";
-import { Search, Flame, CheckCircle2, Play, ChevronRight } from "lucide-react";
-import { NoteCard } from "@/components/NoteCard";
-import { NewNoteCard } from "@/components/NewNoteCard";
-import { Button } from "@/components/ui/button";
+import { Flame, CheckCircle2, Play } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { currentUser } from "@clerk/nextjs/server";
+import { DashboardNotes } from "@/components/DashboardNotes";
 
 import { prisma } from "@/lib/prisma";
 
@@ -21,6 +18,29 @@ export default async function Dashboard() {
         orderBy: {
             createdAt: 'desc',
         },
+    });
+
+    const noteItems = notes.map((note) => {
+        const subjectName = note.subject?.name || (note.tags.length > 0 ? note.tags[0] : "Inne");
+        const colorMap: Record<string, string> = {
+            "matematyka": "blue",
+            "fizyka": "green",
+            "historia": "orange",
+            "biologia": "purple"
+        };
+        const color = colorMap[subjectName.toLowerCase()] || "blue";
+
+        return {
+            id: note.id,
+            title: note.title || "Bez tytułu",
+            preview: note.summary || note.content || "Oczekiwanie na przetworzenie przez AI...",
+            date: new Date(note.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
+            tag: subjectName,
+            color,
+            status: note.status,
+            tags: note.tags,
+            subjectName: note.subject?.name,
+        };
     });
 
     return (
@@ -59,66 +79,7 @@ export default async function Dashboard() {
                 </div>
             </div>
 
-            {/* Search & Filter */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between">
-                <div className="relative flex-1 max-w-2xl">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="Szukaj w notatkach..."
-                        className="w-full h-12 pl-12 pr-4 rounded-2xl bg-white dark:bg-card border border-border shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-                    <Button className="rounded-xl px-6 h-12 bg-blue-500 hover:bg-blue-600 font-medium">Wszystkie</Button>
-                    <Button variant="outline" className="rounded-xl px-6 h-12 bg-white hover:bg-muted font-medium border-border text-muted-foreground">Matematyka</Button>
-                    <Button variant="outline" className="rounded-xl px-6 h-12 bg-white hover:bg-muted font-medium border-border text-muted-foreground">Historia</Button>
-                    <Button variant="outline" className="rounded-xl px-6 h-12 bg-white hover:bg-muted font-medium border-border text-muted-foreground">Fizyka</Button>
-                </div>
-            </div>
-
-            {/* Recent Notes */}
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">Ostatnie Notatki</h2>
-                    <Link href="/app/notes" className="text-sm font-semibold text-blue-500 hover:text-blue-600 flex items-center gap-1">
-                        Zobacz wszystkie <ChevronRight className="size-4" />
-                    </Link>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {notes.map((note: any) => {
-                        const subjectName = note.subject?.name || (note.tags.length > 0 ? note.tags[0] : "Inne");
-                        const colorMap: Record<string, string> = {
-                            "matematyka": "blue",
-                            "fizyka": "green",
-                            "historia": "orange",
-                            "biologia": "purple"
-                        };
-                        const color = colorMap[subjectName.toLowerCase()] || "blue";
-
-                        return (
-                            <Link href={`/notes/${note.id}`} key={note.id}>
-                                <NoteCard
-                                    id={note.id}
-                                    title={note.title || "Bez tytułu"}
-                                    preview={note.summary || note.content || "Oczekiwanie na przetworzenie przez AI..."}
-                                    date={new Date(note.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
-                                    tag={subjectName}
-                                    color={color}
-                                    status={note.status}
-                                    tags={note.tags}
-                                    subjectName={note.subject?.name}
-                                />
-                            </Link>
-                        );
-                    })}
-                    <Link href="/app/new" className="h-full">
-                        <NewNoteCard />
-                    </Link>
-                </div>
-            </div>
+            <DashboardNotes notes={noteItems} />
 
             {/* Study Plan Section */}
             <div className="space-y-6">
