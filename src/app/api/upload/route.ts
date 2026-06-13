@@ -2,6 +2,7 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { del } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
+import { ALLOWED_UPLOAD_CONTENT_TYPES, MAX_UPLOAD_SIZE_BYTES } from '@/lib/upload-validation';
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
@@ -17,7 +18,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (/* pathname: string, clientPayload */) => {
         return {
-          allowedContentTypes: ['image/jpeg', 'image/png', 'application/pdf'],
+          allowedContentTypes: [...ALLOWED_UPLOAD_CONTENT_TYPES],
+          maximumSizeInBytes: MAX_UPLOAD_SIZE_BYTES,
           tokenPayload: JSON.stringify({
             userId: user.id,
           }),
