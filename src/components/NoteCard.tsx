@@ -137,11 +137,13 @@ export function NoteCard({ id, title, preview, date, tag, color, status, tags = 
                 <div className="p-5 pl-7 flex flex-col gap-4 h-full">
                     {/* Thumbnail / Preview Area */}
                     <div className="relative h-36 rounded-2xl overflow-hidden bg-gradient-to-br from-muted/40 to-muted/10 border border-border/40">
-                        {/* Status Badge */}
-                        <div className={`absolute top-3 right-3 z-10 ${currentStatus.bg} ${currentStatus.text} px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm`}>
-                            <StatusIcon className={`size-3 ${currentStatus.iconClass}`} />
-                            <span>{currentStatus.label}</span>
-                        </div>
+                        {/* Status Badge - shown only when processing failed */}
+                        {status === "FAILED" && (
+                            <div className={`absolute top-3 right-3 z-10 ${currentStatus.bg} ${currentStatus.text} px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm`}>
+                                <StatusIcon className={`size-3 ${currentStatus.iconClass}`} />
+                                <span>{currentStatus.label}</span>
+                            </div>
+                        )}
 
                         {imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
