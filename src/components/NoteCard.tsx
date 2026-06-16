@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Sparkles, Share2, Loader2, AlertCircle, MoreVertical, Trash2, Edit2 } from "lucide-react";
+import { MessageSquare, Sparkles, Share2, Loader2, AlertCircle, MoreVertical, Trash2, Edit2, FileText } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import {
 import { deleteNote, updateNoteDetails } from "@/actions/note";
 import { NoteSettingsForm } from "./NoteSettingsForm";
 
-export function NoteCard({ id, title, preview, date, tag, color, status, tags = [], subjectName }: { id: string; title: string; preview: string; date: string; tag: string; color: string; status: "PROCESSING" | "COMPLETED" | "FAILED", tags?: string[], subjectName?: string }) {
+export function NoteCard({ id, title, preview, date, tag, color, status, tags = [], subjectName, imageUrl }: { id: string; title: string; preview: string; date: string; tag: string; color: string; status: "PROCESSING" | "COMPLETED" | "FAILED", tags?: string[], subjectName?: string, imageUrl?: string | null }) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -33,14 +33,6 @@ export function NoteCard({ id, title, preview, date, tag, color, status, tags = 
     const [editSubject, setEditSubject] = useState(subjectName || "");
     const [editTags, setEditTags] = useState<string[]>(tags);
     const [isSavingDetails, setIsSavingDetails] = useState(false);
-
-    // Update local state when props change (optional, but good practice if list refreshes)
-    // useEffect(() => {
-    //     setEditTitle(title);
-    //     setEditSubject(subjectName || "");
-    //     setEditTags(tags);
-    // }, [title, subjectName, tags]);
-
 
     const colorStyles: Record<string, { border: string; bg: string; text: string }> = {
         blue: { border: "bg-blue-500", bg: "bg-blue-100", text: "text-blue-700" },
@@ -105,7 +97,7 @@ export function NoteCard({ id, title, preview, date, tag, color, status, tags = 
         <>
             <div className="relative group rounded-3xl bg-card shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-border">
                 {/* Left color strip */}
-                <div className={`absolute left-0 top-0 bottom-0 w-2 ${currentStyle.border}`} />
+                <div className={`absolute left-0 top-0 bottom-0 w-2 ${currentStyle.border} z-10`} />
 
                 {/* More Options Menu - Absolute Top Right */}
                 <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -143,27 +135,27 @@ export function NoteCard({ id, title, preview, date, tag, color, status, tags = 
                 </div>
 
                 <div className="p-5 pl-7 flex flex-col gap-4 h-full">
-                    {/* Preview Illustration Area */}
-                    <div className="bg-muted/30 rounded-2xl p-4 relative min-h-[140px]">
+                    {/* Thumbnail / Preview Area */}
+                    <div className="relative h-36 rounded-2xl overflow-hidden bg-gradient-to-br from-muted/40 to-muted/10 border border-border/40">
                         {/* Status Badge */}
-                        <div className={`absolute top-3 right-3 ${currentStatus.bg} ${currentStatus.text} px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm`}>
+                        <div className={`absolute top-3 right-3 z-10 ${currentStatus.bg} ${currentStatus.text} px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm`}>
                             <StatusIcon className={`size-3 ${currentStatus.iconClass}`} />
                             <span>{currentStatus.label}</span>
                         </div>
 
-                        {/* Content Skeleton Representation */}
-                        <div className="space-y-2 mt-2">
-                            <div className="h-2 w-3/4 bg-muted/40 rounded-full" />
-                            <div className="h-2 w-full bg-muted/40 rounded-full" />
-                            <div className="h-2 w-5/6 bg-muted/40 rounded-full" />
-                            <div className="h-2 w-4/5 bg-muted/40 rounded-full" />
-                        </div>
-
-                        {/* Circle placeholders */}
-                        <div className="absolute bottom-4 left-4 flex gap-2">
-                            <div className="size-8 rounded-full border border-muted/40" />
-                            <div className="size-8 rounded-full border border-muted/40" />
-                        </div>
+                        {imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={imageUrl}
+                                alt={title}
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+                                <FileText className="size-12" />
+                            </div>
+                        )}
                     </div>
 
                     {/* Text Content */}

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Search, FileText } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { NewNoteCard } from "@/components/NewNoteCard";
 import { NoteCard } from "@/components/NoteCard";
@@ -19,15 +20,35 @@ export interface DashboardNote {
     status: NoteStatus;
     tags: string[];
     subjectName?: string | null;
+    imageUrl?: string | null;
 }
 
 interface DashboardNotesProps {
     notes: DashboardNote[];
+    /** Section heading. Defaults to "Ostatnie Notatki". */
+    heading?: string;
+    /** When set, shows a "Zobacz wszystkie" link instead of the visible/total counter. */
+    viewAllHref?: string;
+    /** When set, limits how many cards are shown while no search/filter is active. */
+    limit?: number;
+    /** Whether to render the "add note" card at the end. Defaults to true. */
+    showNewCard?: boolean;
 }
 
-export function DashboardNotes({ notes }: DashboardNotesProps) {
+export function DashboardNotes({ notes, heading = "Ostatnie Notatki", viewAllHref, limit, showNewCard = true }: DashboardNotesProps) {
+    const router = useRouter();
     const [query, setQuery] = useState("");
     const [activeSubject, setActiveSubject] = useState("all");
+
+    // Keep the dashboard fresh while any note is still being processed by the AI,
+    // so cards flip from "Przetwarzanie" to "Gotowe" without a manual refresh.
+    useEffect(() => {
+        const hasProcessing = notes.some((note) => note.status === "PROCESSING");
+        if (!hasProcessing) return;
+
+        const interval = setInterval(() => router.refresh(), 5000);
+        return () => clearInterval(interval);
+    }, [notes, router]);
 
     const subjects = useMemo(() => {
         const uniqueSubjects = new Set(notes.map((note) => note.subjectName || note.tag).filter(Boolean));
@@ -50,6 +71,10 @@ export function DashboardNotes({ notes }: DashboardNotesProps) {
             return matchesSubject && (!normalizedQuery || searchableText.includes(normalizedQuery));
         });
     }, [activeSubject, notes, query]);
+
+    const isFiltering = query.trim() !== "" || activeSubject !== "all";
+    const visibleNotes = limit && !isFiltering ? filteredNotes.slice(0, limit) : filteredNotes;
+    const hiddenCount = filteredNotes.length - visibleNotes.length;
 
     return (
         <div className="space-y-6">
@@ -89,33 +114,65 @@ export function DashboardNotes({ notes }: DashboardNotesProps) {
 
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">Ostatnie Notatki</h2>
-                    <span className="text-sm font-semibold text-blue-500 flex items-center gap-1">
-                        {filteredNotes.length} / {notes.length}
-                        <ChevronRight className="size-4" />
-                    </span>
+                    <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">{heading}</h2>
+                    {viewAllHref ? (
+                        <Link href={viewAllHref} className="text-sm font-semibold text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                            Zobacz wszystkie
+                            <ChevronRight className="size-4" />
+                        </Link>
+                    ) : (
+                        <span className="text-sm font-semibold text-blue-500 flex items-center gap-1">
+                            {filteredNotes.length} / {notes.length}
+                        </span>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {filteredNotes.map((note) => (
-                        <Link href={`/notes/${note.id}`} key={note.id}>
-                            <NoteCard
-                                id={note.id}
-                                title={note.title}
-                                preview={note.preview}
-                                date={note.date}
-                                tag={note.tag}
-                                color={note.color}
-                                status={note.status}
-                                tags={note.tags}
-                                subjectName={note.subjectName || undefined}
-                            />
+                {notes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-card/50 py-16 text-center">
+                        <FileText className="size-10 text-muted-foreground/40" />
+                        <p className="text-muted-foreground">Nie masz jeszcze żadnych notatek.</p>
+                        <Link href="/app/new">
+                            <Button className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl">Dodaj pierwszą notatkę</Button>
                         </Link>
-                    ))}
-                    <Link href="/app/new" className="h-full">
-                        <NewNoteCard />
-                    </Link>
-                </div>
+                    </div>
+                ) : filteredNotes.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-border bg-card/50 py-16 text-center text-muted-foreground">
+                        Brak notatek pasujących do wyszukiwania.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        {visibleNotes.map((note) => (
+                            <Link href={`/notes/${note.id}`} key={note.id}>
+                                <NoteCard
+                                    id={note.id}
+                                    title={note.title}
+                                    preview={note.preview}
+                                    date={note.date}
+                                    tag={note.tag}
+                                    color={note.color}
+                                    status={note.status}
+                                    tags={note.tags}
+                                    subjectName={note.subjectName || undefined}
+                                    imageUrl={note.imageUrl}
+                                />
+                            </Link>
+                        ))}
+                        {showNewCard && (
+                            <Link href="/app/new" className="h-full">
+                                <NewNoteCard />
+                            </Link>
+                        )}
+                    </div>
+                )}
+
+                {viewAllHref && hiddenCount > 0 && (
+                    <div className="flex justify-center">
+                        <Link href={viewAllHref} className="text-sm font-semibold text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                            Zobacz wszystkie ({notes.length})
+                            <ChevronRight className="size-4" />
+                        </Link>
+                    </div>
+                )}
             </div>
         </div>
     );
