@@ -56,6 +56,8 @@ import { ChatInterface } from "@/components/chat-interface";
 import { NoteSettingsForm } from "./NoteSettingsForm";
 import { NoteFileUpload, FileUpload } from "./NoteFileUpload";
 import { NoteAiStatus } from "@/components/NoteAiStatus";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface NoteViewProps {
     note: {
@@ -511,12 +513,10 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                                                     hasSummary={Boolean(note.summary)}
                                                     canProcess={isOwner}
                                                 />
-                                                {note.summary ? (
-                                                    <div className="text-sm md:text-base leading-relaxed text-foreground whitespace-pre-wrap">
-                                                        {note.summary}
+                                                {note.summary && (
+                                                    <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-blue-600">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.summary}</ReactMarkdown>
                                                     </div>
-                                                ) : (
-                                                    <p className="text-muted-foreground italic">Brak podsumowania.</p>
                                                 )}
                                             </ScrollArea>
                                         </div>
