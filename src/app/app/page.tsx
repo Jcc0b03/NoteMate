@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Flame, CheckCircle2, Play } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { currentUser } from "@clerk/nextjs/server";
@@ -40,8 +41,12 @@ export default async function Dashboard() {
             status: note.status,
             tags: note.tags,
             subjectName: note.subject?.name,
+            imageUrl: note.imageUrl,
         };
     });
+
+    const completedCount = notes.filter((note) => note.status === "COMPLETED").length;
+    const completedPercent = notes.length > 0 ? Math.round((completedCount / notes.length) * 100) : 0;
 
     return (
         <div className="space-y-10">
@@ -49,10 +54,12 @@ export default async function Dashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-blue-950 dark:text-blue-50">
-                        Cześć, {user?.firstName || "Alex"}! 👋
+                        Cześć, {user?.firstName || "Studencie"}! 👋
                     </h1>
                     <p className="text-muted-foreground mt-2 text-lg">
-                        Masz dzisiaj 3 notatki do powtórzenia.
+                        {notes.length > 0
+                            ? `Masz ${notes.length} ${notes.length === 1 ? "notatkę" : "notatek"} w swojej bibliotece.`
+                            : "Dodaj pierwszą notatkę, a AI zajmie się resztą."}
                     </p>
                 </div>
 
@@ -62,8 +69,8 @@ export default async function Dashboard() {
                             <Flame className="size-5 fill-orange-600" />
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Dni z rzędu</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">12</span>
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Notatki</span>
+                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{notes.length}</span>
                         </div>
                     </div>
 
@@ -72,14 +79,14 @@ export default async function Dashboard() {
                             <CheckCircle2 className="size-5" />
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Ukończone</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">85%</span>
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Przetworzone</span>
+                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{completedPercent}%</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <DashboardNotes notes={noteItems} />
+            <DashboardNotes notes={noteItems} heading="Ostatnie Notatki" viewAllHref="/app/notes" limit={7} />
 
             {/* Study Plan Section */}
             <div className="space-y-6">
@@ -127,11 +134,11 @@ export default async function Dashboard() {
 
             {/* Footer */}
             <footer className="py-8 text-center text-sm text-muted-foreground">
-                <p>© 2023 Notemate. Wszelkie prawa zastrzeżone.</p>
+                <p>© {new Date().getFullYear()} Notemate. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex justify-center gap-4 mt-2">
-                    <a href="#" className="hover:text-foreground">Prywatność</a>
-                    <a href="#" className="hover:text-foreground">Regulamin</a>
-                    <a href="#" className="hover:text-foreground">Pomoc</a>
+                    <Link href="/privacy" className="hover:text-foreground">Prywatność</Link>
+                    <Link href="/terms" className="hover:text-foreground">Regulamin</Link>
+                    <Link href="/help" className="hover:text-foreground">Pomoc</Link>
                 </div>
             </footer>
         </div>

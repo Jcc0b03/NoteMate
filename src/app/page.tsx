@@ -392,8 +392,9 @@ export default async function LandingPage() {
               <div>
                 <h4 className="font-bold text-slate-900 mb-4 text-sm">Prawne</h4>
                 <ul className="space-y-3 text-sm text-slate-600">
-                  <li><Link href="#" className="hover:text-blue-600">Prywatność</Link></li>
-                  <li><Link href="#" className="hover:text-blue-600">Regulamin</Link></li>
+                  <li><Link href="/privacy" className="hover:text-blue-600">Prywatność</Link></li>
+                  <li><Link href="/terms" className="hover:text-blue-600">Regulamin</Link></li>
+                  <li><Link href="/help" className="hover:text-blue-600">Pomoc</Link></li>
                 </ul>
               </div>
             </div>

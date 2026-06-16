@@ -55,6 +55,7 @@ import { Loader2 } from "lucide-react";
 import { ChatInterface } from "@/components/chat-interface";
 import { NoteSettingsForm } from "./NoteSettingsForm";
 import { NoteFileUpload, FileUpload } from "./NoteFileUpload";
+import { NoteAiStatus } from "@/components/NoteAiStatus";
 
 interface NoteViewProps {
     note: {
@@ -70,6 +71,7 @@ interface NoteViewProps {
         isPublicEditable?: boolean;
         subject?: { name: string } | null;
         tags: string[];
+        status?: string;
     };
     readOnly?: boolean;
     isOwner?: boolean;
@@ -503,6 +505,12 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                                         </div>
                                         <div className="flex-1 overflow-hidden">
                                             <ScrollArea className="h-full p-6">
+                                                <NoteAiStatus
+                                                    noteId={note.id}
+                                                    status={(note.status as "PROCESSING" | "COMPLETED" | "FAILED") ?? "COMPLETED"}
+                                                    hasSummary={Boolean(note.summary)}
+                                                    canProcess={isOwner}
+                                                />
                                                 {note.summary ? (
                                                     <div className="text-sm md:text-base leading-relaxed text-foreground whitespace-pre-wrap">
                                                         {note.summary}

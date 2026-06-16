@@ -206,7 +206,7 @@ export default function NewNotePage() {
                 subjectName = selected ? selected.label : value;
             }
 
-            await createNote({
+            const result = await createNote({
                 title,
                 subjectName,
                 tags,
@@ -217,7 +217,11 @@ export default function NewNotePage() {
                     size: f.file.size
                 })),
             });
-            router.push("/app");
+            if (result?.success && result.noteId) {
+                router.push(`/notes/${result.noteId}`);
+            } else {
+                router.push("/app");
+            }
         } catch (error) {
             console.error("Failed to save note:", error);
             // You might want to show a toast here

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, Plus, BookOpen, Settings, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,34 +14,56 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SignOutButton, useUser } from "@clerk/nextjs";
+import { cn } from "@/lib/utils";
+
+const navLinks = [
+    { href: "/app", label: "Dashboard" },
+    { href: "/app/notes", label: "Moje Notatki" },
+    { href: "/app/plan", label: "Plan Nauki" },
+];
 
 export function Topbar() {
     const { user } = useUser();
+    const pathname = usePathname();
+
+    const initials = (
+        `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}` ||
+        user?.primaryEmailAddress?.emailAddress?.[0] ||
+        "U"
+    ).toUpperCase();
 
     return (
         <header className="h-20 border-b border-border bg-white dark:bg-card sticky top-0 z-50 px-4 md:px-8 flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-                <div className="bg-blue-600 text-white p-2 rounded-xl">
+            {/* Logo -> Dashboard */}
+            <Link href="/app" className="flex items-center gap-2 group">
+                <div className="bg-blue-600 text-white p-2 rounded-xl group-hover:scale-105 transition-transform">
                     <BookOpen className="size-5" />
                 </div>
                 <div className="flex flex-col">
                     <span className="font-bold text-lg leading-tight text-blue-950 dark:text-blue-100">Notemate</span>
                     <span className="text-[10px] text-blue-500 font-medium tracking-wide">Twój partner w nauce</span>
                 </div>
-            </div>
+            </Link>
 
             {/* Navigation */}
             <nav className="hidden md:flex items-center gap-8">
-                <Link href="/app" className="text-sm font-semibold text-foreground">
-                    Dashboard
-                </Link>
-                <Link href="/app/notes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Moje Notatki
-                </Link>
-                <Link href="/app/plan" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Plan Nauki
-                </Link>
+                {navLinks.map((link) => {
+                    const isActive = link.href === "/app" ? pathname === "/app" : pathname.startsWith(link.href);
+                    return (
+                        <Link
+                            key={link.href}
+                            href={link.href}
+                            className={cn(
+                                "text-sm transition-colors",
+                                isActive
+                                    ? "font-semibold text-foreground"
+                                    : "font-medium text-muted-foreground hover:text-foreground",
+                            )}
+                        >
+                            {link.label}
+                        </Link>
+                    );
+                })}
             </nav>
 
             {/* Right Actions */}
@@ -60,25 +83,29 @@ export function Topbar() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Avatar className="size-9 bg-orange-100 border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity">
-                            <AvatarImage src="https://github.com/shadcn.png" />
-                            <AvatarFallback className="text-orange-700 font-bold">AL</AvatarFallback>
+                            <AvatarImage src={user?.imageUrl} alt={user?.fullName ?? "Użytkownik"} />
+                            <AvatarFallback className="text-orange-700 font-bold">{initials}</AvatarFallback>
                         </Avatar>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuLabel className="font-normal">
                             <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium leading-none">{user?.fullName}</p>
+                                <p className="text-sm font-medium leading-none">{user?.fullName ?? "Użytkownik"}</p>
                                 <p className="text-xs leading-none text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer">
-                            <User className="mr-2 size-4" />
-                            <span>Profil</span>
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                            <Link href="/app/settings">
+                                <User className="mr-2 size-4" />
+                                <span>Profil</span>
+                            </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
-                            <Settings className="mr-2 size-4" />
-                            <span>Ustawienia</span>
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                            <Link href="/app/settings">
+                                <Settings className="mr-2 size-4" />
+                                <span>Ustawienia</span>
+                            </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <SignOutButton>
