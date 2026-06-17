@@ -4,7 +4,16 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { processNoteWithAi } from "@/lib/note-ai";
+
+function scheduleNoteProcessing(noteId: string) {
+    after(async () => {
+        await processNoteWithAi(noteId).catch((error) => {
+            console.error("Background note processing failed:", error);
+        });
+    });
+}
 
 export async function createNote(data: {
     title: string;
@@ -63,6 +72,7 @@ export async function createNote(data: {
     });
 
     revalidatePath("/app");
+    scheduleNoteProcessing(note.id);
     return { success: true, noteId: note.id };
 }
 
@@ -285,6 +295,7 @@ export async function addNoteFiles(noteId: string, files: { url: string; name: s
         await prisma.note.update({
             where: { id: noteId },
             data: {
+                status: "PROCESSING",
                 files: {
                     create: files.map((f) => ({
                         url: f.url,
@@ -298,11 +309,12 @@ export async function addNoteFiles(noteId: string, files: { url: string; name: s
         });
 
         revalidatePath(`/notes/${noteId}`);
+        revalidatePath("/app");
+        revalidatePath("/app/notes");
+        scheduleNoteProcessing(noteId);
         return { success: true };
     } catch (error) {
         console.error("Error adding files:", error);
         return { success: false, error: "Failed to add files" };
     }
 }
-
-

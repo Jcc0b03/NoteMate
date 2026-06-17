@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Search, FileText } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { NewNoteCard } from "@/components/NewNoteCard";
 import { NoteCard } from "@/components/NoteCard";
@@ -39,12 +39,25 @@ export function DashboardNotes({ notes, heading = "Ostatnie Notatki", viewAllHre
     const router = useRouter();
     const [query, setQuery] = useState("");
     const [activeSubject, setActiveSubject] = useState("all");
+    const startedProcessing = useRef<Set<string>>(new Set());
 
-    // Keep the dashboard fresh while any note is still being processed by the AI,
-    // so cards flip from "Przetwarzanie" to "Gotowe" without a manual refresh.
     useEffect(() => {
-        const hasProcessing = notes.some((note) => note.status === "PROCESSING");
-        if (!hasProcessing) return;
+        const processingIds = notes
+            .filter((note) => note.status === "PROCESSING")
+            .map((note) => note.id);
+
+        if (processingIds.length === 0) return;
+
+        processingIds.forEach((noteId) => {
+            if (startedProcessing.current.has(noteId)) return;
+            startedProcessing.current.add(noteId);
+
+            fetch("/api/ai/process", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ noteId }),
+            }).finally(() => router.refresh());
+        });
 
         const interval = setInterval(() => router.refresh(), 5000);
         return () => clearInterval(interval);
