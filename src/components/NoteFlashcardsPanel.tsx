@@ -67,15 +67,15 @@ export function NoteFlashcardsPanel({ noteId, noteStatus }: NoteFlashcardsPanelP
         <div className="h-full overflow-hidden">
             <div className="h-full overflow-y-auto px-1 py-1">
                 <div className="mx-auto flex max-w-4xl flex-col gap-5">
-                    <div className="rounded-lg border bg-card p-5">
+                    <div className="rounded-lg border border-sky-100 bg-sky-50 p-5">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-start gap-3">
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white">
                                     <CreditCard className="size-5" />
                                 </div>
                                 <div>
                                     <h2 className="text-lg font-semibold">Fiszki z notatki</h2>
-                                    <p className="mt-1 text-sm text-muted-foreground">
+                                    <p className="mt-1 text-sm text-slate-600">
                                         Wygeneruj talię z podsumowania i transkrypcji, a potem otwórz ją na telefonie przez QR.
                                     </p>
                                 </div>
@@ -88,7 +88,7 @@ export function NoteFlashcardsPanel({ noteId, noteStatus }: NoteFlashcardsPanelP
                                         Odśwież
                                     </Button>
                                 )}
-                                <Button onClick={() => generateFlashcards(Boolean(deck))} disabled={isGenerating || !isReady}>
+                                <Button onClick={() => generateFlashcards(Boolean(deck))} disabled={isGenerating || !isReady} className="bg-sky-600 text-white hover:bg-sky-700">
                                     {isGenerating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
                                     {deck ? "Wygeneruj ponownie" : "Generuj fiszki"}
                                 </Button>
@@ -128,11 +128,15 @@ export function NoteFlashcardsPanel({ noteId, noteStatus }: NoteFlashcardsPanelP
 
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     {deck.cards.slice(0, 6).map((card, index) => (
-                                        <div key={`${card.front}-${index}`} className="rounded-lg border bg-background p-4">
-                                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pytanie</div>
-                                            <p className="mt-1 text-sm font-medium">{card.front}</p>
-                                            <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Odpowiedź</div>
-                                            <p className="mt-1 text-sm text-muted-foreground">{card.back}</p>
+                                        <div key={`${card.front}-${index}`} className="overflow-hidden rounded-lg border border-slate-200">
+                                            <div className="border-b border-sky-200 bg-sky-50 p-4">
+                                                <div className="text-xs font-semibold uppercase text-sky-700">Pytanie</div>
+                                                <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-950">{card.front}</p>
+                                            </div>
+                                            <div className="bg-emerald-50 p-4">
+                                                <div className="text-xs font-semibold uppercase text-emerald-700">Odpowiedź</div>
+                                                <p className="mt-1 text-sm leading-relaxed text-slate-700">{card.back}</p>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
