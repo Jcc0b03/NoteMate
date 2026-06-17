@@ -453,21 +453,21 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                     <ResizablePanel defaultSize={50} minSize={30}>
                         <div className="flex h-full flex-col bg-background">
                             <Tabs defaultValue="summary" className="flex min-h-0 w-full flex-1 flex-col">
-                                <div className="border-b px-4 pt-3">
-                                    <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto bg-transparent p-0">
-                                        <TabsTrigger value="summary" className="gap-2 rounded-none border-b-2 border-transparent px-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                <div className="border-b bg-card/80 px-4">
+                                    <TabsList className="grid h-14 w-full grid-cols-4 bg-transparent p-0">
+                                        <TabsTrigger value="summary" className="h-full gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-0 data-[state=active]:border-sky-600 data-[state=active]:bg-transparent data-[state=active]:text-sky-700 data-[state=active]:shadow-none">
                                             <FileText className="size-4" />
                                             Podsumowanie
                                         </TabsTrigger>
-                                        <TabsTrigger value="transcript" className="gap-2 rounded-none border-b-2 border-transparent px-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                        <TabsTrigger value="transcript" className="h-full gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-0 data-[state=active]:border-sky-600 data-[state=active]:bg-transparent data-[state=active]:text-sky-700 data-[state=active]:shadow-none">
                                             <AlignLeft className="size-4" />
                                             Transkrypcja
                                         </TabsTrigger>
-                                        <TabsTrigger value="flashcards" className="gap-2 rounded-none border-b-2 border-transparent px-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                        <TabsTrigger value="flashcards" className="h-full gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-0 data-[state=active]:border-sky-600 data-[state=active]:bg-transparent data-[state=active]:text-sky-700 data-[state=active]:shadow-none">
                                             <CreditCard className="size-4" />
                                             Fiszki
                                         </TabsTrigger>
-                                        <TabsTrigger value="chat" className="gap-2 rounded-none border-b-2 border-transparent px-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                                        <TabsTrigger value="chat" className="h-full gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-0 data-[state=active]:border-sky-600 data-[state=active]:bg-transparent data-[state=active]:text-sky-700 data-[state=active]:shadow-none">
                                             <MessageSquare className="size-4" />
                                             Asystent
                                         </TabsTrigger>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Plus, BookOpen, Settings, LogOut, User } from "lucide-react";
+import { Bell, Plus, Settings, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const navLinks = [
     { href: "/app", label: "Dashboard" },
@@ -35,18 +36,12 @@ export function Topbar() {
     return (
         <header className="h-20 border-b border-border bg-white dark:bg-card sticky top-0 z-50 px-4 md:px-8 flex items-center justify-between">
             {/* Logo -> Dashboard */}
-            <Link href="/app" className="flex items-center gap-2 group">
-                <div className="bg-blue-600 text-white p-2 rounded-xl group-hover:scale-105 transition-transform">
-                    <BookOpen className="size-5" />
-                </div>
-                <div className="flex flex-col">
-                    <span className="font-bold text-lg leading-tight text-blue-950 dark:text-blue-100">Notemate</span>
-                    <span className="text-[10px] text-blue-500 font-medium tracking-wide">Twój partner w nauce</span>
-                </div>
+            <Link href="/app" className="flex items-center">
+                <BrandLogo className="h-12 w-auto" priority />
             </Link>
 
             {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden h-full items-center gap-8 md:flex">
                 {navLinks.map((link) => {
                     const isActive = link.href === "/app" ? pathname === "/app" : pathname.startsWith(link.href);
                     return (
@@ -54,10 +49,10 @@ export function Topbar() {
                             key={link.href}
                             href={link.href}
                             className={cn(
-                                "text-sm transition-colors",
+                                "relative flex h-full items-center border-b-2 px-1 text-sm transition-colors",
                                 isActive
-                                    ? "font-semibold text-foreground"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    ? "border-sky-600 font-semibold text-sky-700"
+                                    : "border-transparent font-medium text-muted-foreground hover:text-foreground",
                             )}
                         >
                             {link.label}

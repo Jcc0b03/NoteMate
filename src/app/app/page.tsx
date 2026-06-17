@@ -1,146 +1,164 @@
 import Link from "next/link";
-import { Flame, CheckCircle2, Play } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { ArrowRight, BookOpenCheck, CheckCircle2, Clock3, CreditCard, FileText, Loader2, Plus, Sparkles } from "lucide-react";
 import { currentUser } from "@clerk/nextjs/server";
-import { DashboardNotes } from "@/components/DashboardNotes";
-
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { prisma } from "@/lib/prisma";
 
 export default async function Dashboard() {
     const user = await currentUser();
 
     const notes = await prisma.note.findMany({
-        where: {
-            userId: user?.id,
-        },
+        where: { userId: user?.id },
         include: {
             subject: true,
+            flashcardDecks: true,
         },
-        orderBy: {
-            createdAt: 'desc',
-        },
-    });
-
-    const noteItems = notes.map((note) => {
-        const subjectName = note.subject?.name || (note.tags.length > 0 ? note.tags[0] : "Inne");
-        const colorMap: Record<string, string> = {
-            "matematyka": "blue",
-            "fizyka": "green",
-            "historia": "orange",
-            "biologia": "purple"
-        };
-        const color = colorMap[subjectName.toLowerCase()] || "blue";
-
-        return {
-            id: note.id,
-            title: note.title || "Bez tytułu",
-            preview: note.summary || note.content || "Oczekiwanie na przetworzenie przez AI...",
-            date: new Date(note.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }),
-            tag: subjectName,
-            color,
-            status: note.status,
-            tags: note.tags,
-            subjectName: note.subject?.name,
-            imageUrl: note.imageUrl,
-        };
+        orderBy: { createdAt: "desc" },
     });
 
     const completedCount = notes.filter((note) => note.status === "COMPLETED").length;
+    const processingCount = notes.filter((note) => note.status === "PROCESSING").length;
+    const failedCount = notes.filter((note) => note.status === "FAILED").length;
+    const flashcardDecksCount = notes.reduce((sum, note) => sum + note.flashcardDecks.length, 0);
     const completedPercent = notes.length > 0 ? Math.round((completedCount / notes.length) * 100) : 0;
+    const recentNotes = notes.slice(0, 4);
+    const readyForStudy = notes
+        .filter((note) => note.status === "COMPLETED")
+        .slice(0, 3);
 
     return (
-        <div className="space-y-10">
-            {/* Welcome Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-                <div>
-                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-blue-950 dark:text-blue-50">
-                        Cześć, {user?.firstName || "Studencie"}! 👋
-                    </h1>
-                    <p className="text-muted-foreground mt-2 text-lg">
-                        {notes.length > 0
-                            ? `Masz ${notes.length} ${notes.length === 1 ? "notatkę" : "notatek"} w swojej bibliotece.`
-                            : "Dodaj pierwszą notatkę, a AI zajmie się resztą."}
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <div className="bg-white dark:bg-card px-5 py-3 rounded-2xl shadow-sm border border-border flex items-center gap-4 min-w-[160px]">
-                        <div className="size-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
-                            <Flame className="size-5 fill-orange-600" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Notatki</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{notes.length}</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-card px-5 py-3 rounded-2xl shadow-sm border border-border flex items-center gap-4 min-w-[160px]">
-                        <div className="size-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                            <CheckCircle2 className="size-5" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Przetworzone</span>
-                            <span className="text-xl font-bold text-blue-950 dark:text-blue-50">{completedPercent}%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <DashboardNotes notes={noteItems} heading="Ostatnie Notatki" viewAllHref="/app/notes" limit={7} />
-
-            {/* Study Plan Section */}
-            <div className="space-y-6">
-                <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">Plan Powtórek</h2>
-
-                <div className="bg-white dark:bg-card rounded-3xl p-8 shadow-sm border border-border grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
-                    {/* Progress */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                Postęp Dzienny
-                            </div>
-                            <span className="font-bold text-blue-600">70%</span>
-                        </div>
-                        <Progress value={70} className="h-3 bg-blue-100 [&>div]:bg-blue-500 rounded-full" />
-                        <p className="text-sm text-muted-foreground font-medium">
-                            Jeszcze 15 minut nauki, aby osiągnąć cel!
+        <div className="space-y-8">
+            <section className="rounded-2xl border bg-white p-6 shadow-sm dark:bg-card">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-sky-600">Dashboard</p>
+                        <h1 className="mt-1 text-3xl font-bold tracking-tight text-blue-950 dark:text-blue-50 md:text-4xl">
+                            Cześć, {user?.firstName || "Studencie"}
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-muted-foreground">
+                            Szybki przegląd biblioteki, przetwarzania AI i materiałów gotowych do powtórki.
                         </p>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Link href="/app/new">
+                            <Button className="bg-sky-600 text-white hover:bg-sky-700">
+                                <Plus className="mr-2 size-4" />
+                                Nowa notatka
+                            </Button>
+                        </Link>
+                        <Link href="/app/plan">
+                            <Button variant="outline">
+                                <BookOpenCheck className="mr-2 size-4" />
+                                Plan nauki
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            </section>
 
-                    {/* Task 1 */}
-                    <div className="bg-gray-50 dark:bg-muted/30 rounded-2xl p-4 flex items-center gap-4 border border-border/50">
-                        <div className="size-12 rounded-xl bg-green-100 flex items-center justify-center text-green-600 shrink-0">
-                            <CheckCircle2 className="size-6" />
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-card">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Notatki</span>
+                        <FileText className="size-5 text-sky-600" />
+                    </div>
+                    <p className="mt-3 text-3xl font-bold">{notes.length}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">W całej bibliotece</p>
+                </div>
+                <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-card">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Przetworzone</span>
+                        <CheckCircle2 className="size-5 text-emerald-600" />
+                    </div>
+                    <p className="mt-3 text-3xl font-bold">{completedPercent}%</p>
+                    <Progress value={completedPercent} className="mt-3 h-2 bg-emerald-100 [&>div]:bg-emerald-500" />
+                </div>
+                <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-card">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">W toku</span>
+                        <Loader2 className="size-5 text-amber-600" />
+                    </div>
+                    <p className="mt-3 text-3xl font-bold">{processingCount}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{failedCount > 0 ? `${failedCount} wymaga ponowienia` : "AI działa w tle"}</p>
+                </div>
+                <div className="rounded-xl border bg-white p-5 shadow-sm dark:bg-card">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Zestawy fiszek</span>
+                        <CreditCard className="size-5 text-violet-600" />
+                    </div>
+                    <p className="mt-3 text-3xl font-bold">{flashcardDecksCount}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Gotowe do nauki</p>
+                </div>
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+                <div className="rounded-2xl border bg-white p-6 shadow-sm dark:bg-card">
+                    <div className="mb-5 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">Ostatnia aktywność</h2>
+                            <p className="text-sm text-muted-foreground">Najnowsze notatki w bibliotece.</p>
                         </div>
-                        <div className="space-y-1">
-                            <h4 className="font-bold text-sm text-blue-950 dark:text-blue-50">Review: Gramatyka Angielska</h4>
-                            <p className="text-xs text-muted-foreground">5 kart • Wysoki priorytet</p>
+                        <Link href="/app/notes" className="text-sm font-semibold text-sky-600 hover:text-sky-700">
+                            Wszystkie
+                        </Link>
+                    </div>
+
+                    {recentNotes.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+                            Nie masz jeszcze notatek.
+                        </div>
+                    ) : (
+                        <div className="divide-y">
+                            {recentNotes.map((note) => (
+                                <Link key={note.id} href={`/notes/${note.id}`} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold">{note.title || "Bez tytułu"}</p>
+                                        <p className="mt-1 truncate text-sm text-muted-foreground">
+                                            {note.subject?.name || note.tags[0] || "Bez przedmiotu"} • {new Date(note.createdAt).toLocaleDateString("pl-PL")}
+                                        </p>
+                                    </div>
+                                    <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                                        {note.status === "COMPLETED" ? "Gotowe" : note.status === "PROCESSING" ? "AI pracuje" : "Błąd"}
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border bg-white p-6 shadow-sm dark:bg-card">
+                    <div className="mb-5 flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                            <Clock3 className="size-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-blue-950 dark:text-blue-50">Dzisiaj do nauki</h2>
+                            <p className="text-sm text-muted-foreground">{readyForStudy.length} propozycje</p>
                         </div>
                     </div>
 
-                    {/* Task 2 */}
-                    <div className="bg-gray-50 dark:bg-muted/30 rounded-2xl p-4 flex items-center gap-4 border border-border/50">
-                        <div className="size-12 rounded-xl bg-white flex items-center justify-center text-blue-950 shrink-0 shadow-sm border border-border/50">
-                            <Play className="size-5 ml-0.5 fill-blue-950" />
-                        </div>
-                        <div className="space-y-1">
-                            <h4 className="font-bold text-sm text-blue-950 dark:text-blue-50">Quiz: Daty Historyczne</h4>
-                            <p className="text-xs text-muted-foreground">10 pytań • Średni priorytet</p>
-                        </div>
+                    <div className="space-y-3">
+                        {readyForStudy.length === 0 ? (
+                            <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                                Gdy AI przetworzy notatki, pojawią się tu sugestie do powtórki.
+                            </p>
+                        ) : (
+                            readyForStudy.map((note) => (
+                                <Link key={note.id} href={`/notes/${note.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-4 hover:bg-muted/30">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold">{note.title || "Bez tytułu"}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {note.flashcardDecks.length > 0 ? `${note.flashcardDecks.length} zest. fiszek` : "Wygeneruj fiszki"}
+                                        </p>
+                                    </div>
+                                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                                </Link>
+                            ))
+                        )}
                     </div>
-
                 </div>
-            </div>
-
-            {/* Footer */}
-            <footer className="py-8 text-center text-sm text-muted-foreground">
-                <p>© {new Date().getFullYear()} Notemate. Wszelkie prawa zastrzeżone.</p>
-                <div className="flex justify-center gap-4 mt-2">
-                    <Link href="/privacy" className="hover:text-foreground">Prywatność</Link>
-                    <Link href="/terms" className="hover:text-foreground">Regulamin</Link>
-                    <Link href="/help" className="hover:text-foreground">Pomoc</Link>
-                </div>
-            </footer>
+            </section>
         </div>
     );
 }
