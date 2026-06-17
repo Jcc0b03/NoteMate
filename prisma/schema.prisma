@@ -88,8 +88,6 @@ model FlashcardDeck {
   cards     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([noteId, userId])
 }
 
 enum NoteStatus {

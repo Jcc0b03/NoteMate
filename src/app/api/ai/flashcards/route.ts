@@ -15,6 +15,22 @@ interface FlashcardResponse {
     cards: Flashcard[];
 }
 
+function serializeDeck(deck: {
+    id: string;
+    token: string;
+    title: string | null;
+    cards: Prisma.JsonValue;
+    createdAt: Date;
+}) {
+    return {
+        id: deck.id,
+        token: deck.token,
+        title: deck.title,
+        cards: deck.cards,
+        createdAt: deck.createdAt.toISOString(),
+    };
+}
+
 const flashcardsSchema = jsonSchema<FlashcardResponse>({
     type: "object",
     properties: {
@@ -43,21 +59,14 @@ const flashcardsSchema = jsonSchema<FlashcardResponse>({
     additionalProperties: false,
 });
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
     const user = await currentUser();
     if (!user) {
         return new Response("Unauthorized", { status: 401 });
     }
 
-    let noteId = "";
-    let regenerate = false;
-    try {
-        const body = await req.json();
-        noteId = typeof body?.noteId === "string" ? body.noteId : "";
-        regenerate = Boolean(body?.regenerate);
-    } catch {
-        return new Response("Invalid body", { status: 400 });
-    }
+    const { searchParams } = new URL(req.url);
+    const noteId = searchParams.get("noteId") || "";
 
     if (!noteId) {
         return new Response("Missing noteId", { status: 400 });
@@ -66,10 +75,9 @@ export async function POST(req: Request) {
     const note = await prisma.note.findUnique({
         where: { id: noteId },
         include: {
-            subject: true,
             flashcardDecks: {
                 where: { userId: user.id },
-                take: 1,
+                orderBy: { createdAt: "desc" },
             },
         },
     });
@@ -83,17 +91,44 @@ export async function POST(req: Request) {
         return new Response("Forbidden", { status: 403 });
     }
 
-    const existingDeck = note.flashcardDecks[0];
-    if (existingDeck && !regenerate) {
-        return Response.json({
-            success: true,
-            deck: {
-                id: existingDeck.id,
-                token: existingDeck.token,
-                title: existingDeck.title,
-                cards: existingDeck.cards,
-            },
-        });
+    return Response.json({
+        success: true,
+        decks: note.flashcardDecks.map(serializeDeck),
+    });
+}
+
+export async function POST(req: Request) {
+    const user = await currentUser();
+    if (!user) {
+        return new Response("Unauthorized", { status: 401 });
+    }
+
+    let noteId = "";
+    let deckTitle = "";
+    try {
+        const body = await req.json();
+        noteId = typeof body?.noteId === "string" ? body.noteId : "";
+        deckTitle = typeof body?.deckTitle === "string" ? body.deckTitle.trim() : "";
+    } catch {
+        return new Response("Invalid body", { status: 400 });
+    }
+
+    if (!noteId) {
+        return new Response("Missing noteId", { status: 400 });
+    }
+
+    const note = await prisma.note.findUnique({
+        where: { id: noteId },
+        include: { subject: true },
+    });
+
+    if (!note) {
+        return new Response("Note not found", { status: 404 });
+    }
+
+    const hasAccess = note.userId === user.id || note.isShared || note.sharedWith.includes(user.id);
+    if (!hasAccess) {
+        return new Response("Forbidden", { status: 403 });
     }
 
     if (note.status !== "COMPLETED" || (!note.summary && !note.content)) {
@@ -124,33 +159,21 @@ export async function POST(req: Request) {
         });
 
         const cardsJson = object.cards as unknown as Prisma.InputJsonValue;
-        const deck = await prisma.flashcardDeck.upsert({
-            where: {
-                noteId_userId: {
-                    noteId,
-                    userId: user.id,
-                },
-            },
-            update: {
-                title: note.title || "Fiszki z notatki",
-                cards: cardsJson,
-            },
-            create: {
+        const existingDecksCount = await prisma.flashcardDeck.count({
+            where: { noteId, userId: user.id },
+        });
+        const deck = await prisma.flashcardDeck.create({
+            data: {
                 noteId,
                 userId: user.id,
-                title: note.title || "Fiszki z notatki",
+                title: deckTitle || `${note.title || "Fiszki"} - zestaw ${existingDecksCount + 1}`,
                 cards: cardsJson,
             },
         });
 
         return Response.json({
             success: true,
-            deck: {
-                id: deck.id,
-                token: deck.token,
-                title: deck.title,
-                cards: deck.cards,
-            },
+            deck: serializeDeck(deck),
         });
     } catch (error) {
         console.error("Flashcard generation error:", error);
