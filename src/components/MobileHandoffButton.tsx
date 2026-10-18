@@ -13,10 +13,12 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 
-interface HandoffFile {
+export interface HandoffFile {
     url: string;
     pathname: string;
     size: number;
+    name: string;
+    type: string;
 }
 
 interface MobileHandoffButtonProps {
@@ -30,27 +32,39 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [uploadUrl, setUploadUrl] = useState<string>("");
     const [copied, setCopied] = useState(false);
+    const [sessionError, setSessionError] = useState<string | null>(null);
+    const sessionRequestRef = useRef<AbortController | null>(null);
 
     // Track received files to support sequential arrival
     const [receivedCount, setReceivedCount] = useState(0);
     const processedUrlsRef = useRef<Set<string>>(new Set());
 
-    // Generate Session ID when dialog opens
-    useEffect(() => {
-        if (isOpen) {
-            const newSessionId = crypto.randomUUID();
-            setSessionId(newSessionId);
-            // Use window.location.origin to handle local, ngrok, or production URLs
-            setUploadUrl(`${window.location.origin}/mobile-upload?session=${newSessionId}`);
-
-            // Reset state
+    const handleOpenChange = useCallback(async (open: boolean) => {
+        sessionRequestRef.current?.abort();
+        setIsOpen(open);
+        setSessionId(null);
+        setUploadUrl("");
+        if (open) {
+            setSessionError(null);
+            setCopied(false);
             setReceivedCount(0);
             processedUrlsRef.current.clear();
-        } else {
-            setSessionId(null);
-            setUploadUrl("");
+            const controller = new AbortController();
+            sessionRequestRef.current = controller;
+            try {
+                const response = await fetch('/api/handoff/session', { method: 'POST', signal: controller.signal });
+                if (!response.ok) throw new Error('Session creation failed');
+                const { sessionId: id } = await response.json();
+                if (controller.signal.aborted) return;
+                setSessionId(id);
+                setUploadUrl(`${window.location.origin}/mobile-upload?session=${id}`);
+            } catch {
+                if (!controller.signal.aborted) setSessionError('Nie udało się utworzyć sesji. Otwórz okno ponownie.');
+            }
         }
-    }, [isOpen]);
+    }, []);
+
+    useEffect(() => () => sessionRequestRef.current?.abort(), []);
 
     // Poll for changes
     useEffect(() => {
@@ -70,14 +84,7 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
                 // Handle files
                 if (data.found && data.blobs && data.blobs.length > 0) {
                     const newBlobs: HandoffFile[] = [];
-                    let sessionComplete = false;
-
                     data.blobs.forEach((blob: HandoffFile) => {
-                        if (blob.pathname.includes('_SESSION_COMPLETE_')) {
-                            sessionComplete = true;
-                            return; // Don't add marker to files
-                        }
-
                         if (!processedUrlsRef.current.has(blob.url)) {
                             processedUrlsRef.current.add(blob.url);
                             newBlobs.push(blob);
@@ -90,8 +97,8 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
                     }
 
                     // Close dialog automatically if mobile signaled completion
-                    if (sessionComplete) {
-                        setTimeout(() => setIsOpen(false), 1000);
+                    if (data.completed) {
+                        setTimeout(() => handleOpenChange(false), 1000);
                     }
                 }
             } catch (error) {
@@ -100,7 +107,7 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
         }, 3000);
 
         return () => clearInterval(pollInterval);
-    }, [sessionId, isOpen, onUpload]);
+    }, [sessionId, isOpen, onUpload, handleOpenChange]);
 
     const copyToClipboard = useCallback(() => {
         if (!uploadUrl) return;
@@ -110,7 +117,7 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
     }, [uploadUrl]);
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button variant="outline" className={className}>
                     {children || (
@@ -130,6 +137,7 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
                 </DialogHeader>
 
                 <div className="flex flex-col items-center justify-center space-y-6 py-4">
+                    {sessionError && <p role="alert" className="text-sm text-destructive">{sessionError}</p>}
                     {uploadUrl ? (
                         <div className="rounded-lg border bg-white p-4 shadow-sm relative">
                             {receivedCount > 0 && (
@@ -160,7 +168,7 @@ export function MobileHandoffButton({ onUpload, className, children }: MobileHan
                             Oczekiwanie na połączenie...
                         </div>
                     ) : (
-                        <Button onClick={() => setIsOpen(false)} variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white">
+                        <Button onClick={() => handleOpenChange(false)} variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white">
                             <Check className="mr-2 h-4 w-4" />
                             Gotowe ({receivedCount})
                         </Button>

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useSignUp } from "@clerk/nextjs";
+import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
@@ -48,9 +49,10 @@ export default function RegisterPage() {
 
             await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
             setVerifying(true);
-        } catch (err: any) {
+        } catch (err) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Coś poszło nie tak");
+            const message = isClerkAPIResponseError(err) ? err.errors[0]?.message : undefined;
+            setError(message || "Coś poszło nie tak");
         }
     };
 
@@ -69,9 +71,10 @@ export default function RegisterPage() {
             } else {
                 console.error(JSON.stringify(completeSignUp, null, 2));
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Nieprawidłowy kod weryfikacyjny");
+            const message = isClerkAPIResponseError(err) ? err.errors[0]?.message : undefined;
+            setError(message || "Nieprawidłowy kod weryfikacyjny");
         }
     };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { MessageSquare, Sparkles, Share2, Loader2, AlertCircle, MoreVertical, Trash2, Edit2, FileText } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -146,12 +147,13 @@ export function NoteCard({ id, title, preview, date, tag, color, status, tags = 
                         )}
 
                         {imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                                src={imageUrl}
+                            <Image
+                                src={`/api/file?noteId=${encodeURIComponent(id)}`}
                                 alt={title}
-                                loading="lazy"
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                fill
+                                unoptimized
+                                sizes="(max-width: 768px) 100vw, 33vw"
+                                className="object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">

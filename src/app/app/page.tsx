@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpenCheck, CheckCircle2, Clock3, CreditCard, FileText, Loader2, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpenCheck, CheckCircle2, Clock3, CreditCard, FileText, Loader2, Plus } from "lucide-react";
 import { currentUser } from "@clerk/nextjs/server";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";

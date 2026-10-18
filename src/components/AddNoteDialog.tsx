@@ -28,7 +28,6 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { useDropzone } from "react-dropzone";
-import { upload } from "@vercel/blob/client";
 
 const frameworks = [
     {
@@ -87,18 +86,11 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
 
         for (const fileUpload of newFiles) {
             try {
-                const blob = await upload(fileUpload.file.name, fileUpload.file, {
-                    access: 'public',
-                    handleUploadUrl: '/api/upload',
-                    onUploadProgress: (progressEvent) => {
-                        setFiles(prev => prev.map(f => {
-                            if (f.id === fileUpload.id) {
-                                return { ...f, progress: progressEvent.percentage };
-                            }
-                            return f;
-                        }));
-                    }
-                });
+                const form = new FormData();
+                form.append('file', fileUpload.file);
+                const response = await fetch('/api/upload-private', { method: 'POST', body: form });
+                if (!response.ok) throw new Error('Upload failed');
+                const blob = await response.json();
 
                 setFiles(prev => prev.map(f => {
                     if (f.id === fileUpload.id) {
@@ -201,7 +193,7 @@ export function AddNoteDialog({ children }: { children: React.ReactNode }) {
                                                         onClick={handleCreateSubject}
                                                     >
                                                         <Plus className="h-4 w-4" />
-                                                        Dodaj "{inputValue}"
+                                                        Dodaj &quot;{inputValue}&quot;
                                                     </Button>
                                                 </CommandEmpty>
                                                 <CommandGroup>

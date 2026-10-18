@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
     AlignLeft,
     ArrowLeft,
@@ -407,7 +408,7 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                             <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
                                 {note.files.length > 0 ? (
                                     <div
-                                        className="flex h-full w-full origin-center items-center justify-center transition-transform duration-200 ease-out"
+                                        className="relative flex h-full w-full origin-center items-center justify-center transition-transform duration-200 ease-out"
                                         style={{ transform: `scale(${zoom / 100})` }}
                                     >
                                         {files[currentFileIndex].type === "pdf" ? (
@@ -417,10 +418,13 @@ export function NoteView({ note, readOnly = false, isOwner = false }: NoteViewPr
                                                 title={files[currentFileIndex].name}
                                             />
                                         ) : (
-                                            <img
+                                            <Image
                                                 src={files[currentFileIndex].url}
                                                 alt={`Notatka - ${files[currentFileIndex].name}`}
-                                                className="max-h-full max-w-full rounded-lg object-contain shadow-sm"
+                                                fill
+                                                sizes="(max-width: 768px) 100vw, 50vw"
+                                                unoptimized
+                                                className="rounded-lg object-contain shadow-sm"
                                             />
                                         )}
                                     </div>

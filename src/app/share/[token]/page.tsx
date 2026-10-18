@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: SharePageProps): Promise<Meta
         openGraph: {
             title: `${note.title || "Bez tytułu"} | NoteMate`,
             description: description,
-            images: note.imageUrl ? [note.imageUrl] : ["/og-default.png"],
+            images: ["/og-default.png"],
             type: "article",
         },
     };

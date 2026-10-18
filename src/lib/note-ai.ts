@@ -2,6 +2,8 @@ import { google } from "@ai-sdk/google";
 import { generateObject, jsonSchema } from "ai";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { HttpError } from "@/lib/http-error";
+import { readStoredFileBytes } from "@/lib/file-storage";
 
 export interface NoteAnalysis {
     summary: string;
@@ -38,11 +40,11 @@ export async function processNoteWithAi(noteId: string, options: ProcessNoteOpti
     });
 
     if (!note) {
-        throw new Error("Note not found");
+        throw new HttpError(404, "Note not found");
     }
 
     if (options.userId && options.requireOwner !== false && note.userId !== options.userId) {
-        throw new Error("Forbidden");
+        throw new HttpError(403, "Forbidden");
     }
 
     if (note.files.length === 0) {
@@ -61,12 +63,7 @@ export async function processNoteWithAi(noteId: string, options: ProcessNoteOpti
     try {
         const fileParts = await Promise.all(
             note.files.map(async (file, index) => {
-                const response = await fetch(file.url);
-                if (!response.ok) {
-                    throw new Error(`Nie udało się pobrać pliku: ${file.name}`);
-                }
-
-                const data = new Uint8Array(await response.arrayBuffer());
+                const data = await readStoredFileBytes(file.url);
                 return [
                     {
                         type: "text" as const,

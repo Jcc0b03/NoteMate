@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import {
     BookOpen,
@@ -76,7 +76,7 @@ export function AppSidebar() {
                             {!isLoaded ? (
                                 <div className="size-full bg-muted animate-pulse" />
                             ) : user?.imageUrl ? (
-                                <img src={user.imageUrl} alt={user.fullName || "User"} className="size-full object-cover" />
+                                <Image src={user.imageUrl} alt={user.fullName || "User"} width={32} height={32} unoptimized className="size-full object-cover" />
                             ) : (
                                 <span className="text-xs font-semibold">
                                     {user?.firstName?.charAt(0) || user?.emailAddresses[0]?.emailAddress?.charAt(0) || "U"}

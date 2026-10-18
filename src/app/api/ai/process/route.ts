@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { processNoteWithAi } from "@/lib/note-ai";
-import { prisma } from "@/lib/prisma";
+import { HttpError } from "@/lib/http-error";
 
 // Allow up to 60s for the AI to read the files and produce a summary.
 export const maxDuration = 60;
@@ -27,12 +27,9 @@ export async function POST(req: Request) {
         await processNoteWithAi(noteId, { userId: user.id });
         return Response.json({ success: true });
     } catch (error) {
-        await prisma.note
-            .update({ where: { id: noteId }, data: { status: "FAILED" } })
-            .catch(() => undefined);
-
-        const message = error instanceof Error ? error.message : "Nieznany błąd przetwarzania.";
-        const status = message === "Note not found" ? 404 : message === "Forbidden" ? 403 : 500;
+        // Only processNoteWithAi may update status, after checking ownership.
+        const message = error instanceof HttpError ? error.message : "Nie udało się przetworzyć notatki.";
+        const status = error instanceof HttpError ? error.status : 500;
         return Response.json({ success: false, error: message }, { status });
     }
 }

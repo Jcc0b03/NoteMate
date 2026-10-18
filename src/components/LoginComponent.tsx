@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useSignIn } from "@clerk/nextjs";
+import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
@@ -50,7 +51,7 @@ export default function LoginComponent() {
                 );
 
                 if (emailCodeFactor) {
-                    const { emailAddressId } = emailCodeFactor as any;
+                    const { emailAddressId } = emailCodeFactor;
                     await signIn.prepareFirstFactor({
                         strategy: "email_code",
                         emailAddressId,
@@ -64,9 +65,10 @@ export default function LoginComponent() {
                 console.error(JSON.stringify(signInAttempt, null, 2));
                 setError("Nieznany status logowania");
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Coś poszło nie tak");
+            const message = isClerkAPIResponseError(err) ? err.errors[0]?.message : undefined;
+            setError(message || "Coś poszło nie tak");
         }
     };
 
@@ -87,9 +89,10 @@ export default function LoginComponent() {
                 console.error(JSON.stringify(completeSignIn, null, 2));
                 setError("Nie udało się zweryfikować kodu.");
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error(JSON.stringify(err, null, 2));
-            setError(err.errors?.[0]?.message || "Nieprawidłowy kod weryfikacyjny");
+            const message = isClerkAPIResponseError(err) ? err.errors[0]?.message : undefined;
+            setError(message || "Nieprawidłowy kod weryfikacyjny");
         }
     };
 

@@ -1,15 +1,12 @@
 import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages } from 'ai';
 import type { FilePart, ModelMessage, UIMessage } from 'ai';
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
+import { getAiFile, FILE_PREPARATION_TIMEOUT_MS } from "@/lib/ai-files";
+import { HttpError } from "@/lib/http-error";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 
 export const maxDuration = 60;
-const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY!);
 
 type IncomingTextPart = {
     type: 'text';
@@ -139,26 +136,9 @@ export async function POST(req: Request) {
         // 1. Pobranie plików z bazy
         const files = access.note.files;
 
-        // 2. Upload do Google File API
-        const googleFiles = await Promise.all(files.map(async (file) => {
-            const response = await fetch(file.url);
-            const buffer = Buffer.from(await response.arrayBuffer());
-            const tempPath = path.join(os.tmpdir(), `ai-${Date.now()}-${Math.random().toString(36).substring(7)}`);
-
-            await fs.writeFile(tempPath, buffer);
-            const upload = await fileManager.uploadFile(tempPath, {
-                mimeType: file.type,
-                displayName: file.name,
-            });
-            await fs.unlink(tempPath);
-
-            let status = await fileManager.getFile(upload.file.name);
-            while (status.state === FileState.PROCESSING) {
-                await new Promise(r => setTimeout(r, 1000));
-                status = await fileManager.getFile(upload.file.name);
-            }
-            return upload.file;
-        }));
+        // Reuse persisted uploads until their provider-supplied expiration.
+        const deadline = Date.now() + FILE_PREPARATION_TIMEOUT_MS;
+        const googleFiles = await Promise.all(files.map(file => getAiFile(file, deadline)));
 
         // 3. Przygotowanie historii wiadomości
         const uiMessages: Array<Omit<UIMessage, 'id'>> = messages.map(({ role, parts }) => ({
@@ -212,7 +192,7 @@ export async function POST(req: Request) {
 
     } catch (error: unknown) {
         console.error("BŁĄD SERWERA:", error);
-        const message = error instanceof Error ? error.message : 'Unknown server error';
-        return new Response(JSON.stringify({ error: message }), { status: 500 });
+        const message = error instanceof HttpError ? error.message : 'Nie udało się wygenerować odpowiedzi.';
+        return Response.json({ error: message }, { status: error instanceof HttpError ? error.status : 500 });
     }
 }

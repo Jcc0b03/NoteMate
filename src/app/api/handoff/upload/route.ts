@@ -1,43 +1,18 @@
-import { put } from '@vercel/blob';
-import { NextResponse } from 'next/server';
-import { getUploadValidationError, sanitizeUploadFilename } from '@/lib/upload-validation';
+import { uploadPrivateFile } from "@/lib/file-storage";
+import { getHandoffSession, handoffError } from "@/lib/handoff";
+import { HttpError } from "@/lib/http-error";
 
-export async function POST(request: Request): Promise<NextResponse> {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('sessionId');
-
-    if (!sessionId) {
-        return NextResponse.json(
-            { error: 'Missing sessionId parameter' },
-            { status: 400 }
-        );
-    }
-
-    const form = await request.formData();
-    const fileEntry = form.get('file');
-
-    if (!(fileEntry instanceof File)) {
-        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    const validationError = getUploadValidationError(fileEntry);
-
-    if (validationError) {
-        return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-
+export async function POST(request: Request) {
     try {
-        // path: handoff-<sessionId>/filename
-        // Add timestamp to filename to avoid collisions
-        const uniqueName = `${Date.now()}-${sanitizeUploadFilename(fileEntry.name)}`;
-
-        const blob = await put(`handoff-${sessionId}/${uniqueName}`, fileEntry, {
-            access: 'public',
-        });
-
-        return NextResponse.json(blob);
+        // The unguessable, short-lived QR token permits uploading, never listing files.
+        const session = await getHandoffSession(new URL(request.url).searchParams.get("sessionId"));
+        if (session.completedAt) throw new HttpError(409, "Handoff session is complete");
+        const form = await request.formData();
+        const file = form.get("file");
+        if (!(file instanceof File)) throw new HttpError(400, "No file provided");
+        const upload = await uploadPrivateFile(file, session.userId, session.id);
+        return Response.json({ success: true, name: upload.name, size: upload.size });
     } catch (error) {
-        console.error("Upload error:", error);
-        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+        return handoffError(error);
     }
 }

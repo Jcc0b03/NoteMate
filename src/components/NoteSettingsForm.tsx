@@ -128,7 +128,7 @@ export function NoteSettingsForm({
                                         onClick={handleCreateSubject}
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Dodaj "{inputValue}"
+                                        Dodaj &quot;{inputValue}&quot;
                                     </Button>
                                 </CommandEmpty>
                                 <CommandGroup>

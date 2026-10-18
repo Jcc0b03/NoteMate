@@ -1,13 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { readStoredFile } from "@/lib/file-storage";
+import { ALLOWED_UPLOAD_CONTENT_TYPES } from "@/lib/upload-validation";
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const fileId = searchParams.get("fileId");
+    const noteId = searchParams.get("noteId");
     const user = await currentUser();
 
-    if (!fileId) {
+    if (!fileId && !noteId) {
         return new NextResponse("File ID required", { status: 400 });
     }
 
@@ -16,11 +19,15 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const file = await prisma.noteFile.findUnique({
+        const file = fileId ? await prisma.noteFile.findUnique({
             where: { id: fileId },
             include: {
                 note: true,
             },
+        }) : await prisma.noteFile.findFirst({
+            where: { noteId: noteId!, type: { startsWith: "image/" } },
+            orderBy: { createdAt: "asc" },
+            include: { note: true },
         });
 
         if (!file) {
@@ -35,24 +42,19 @@ export async function GET(request: NextRequest) {
             return new NextResponse("Forbidden", { status: 403 });
         }
 
-        // Fetch the file from Vercel Blob using the private token
-        // Use the token for Read/Write if needed, or if URL is private it requires auth
-        const response = await fetch(file.url, {
-            headers: {
-                // Vercel Blob private access requires the token that created it or has access
-                "Authorization": `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
-            },
-        });
+        const response = await readStoredFile(file.url);
 
         if (!response.ok) {
             return new NextResponse("Failed to fetch file upstream", { status: response.status });
         }
 
-        const headers = new Headers(response.headers);
-        headers.set("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`);
-        headers.set("Content-Type", file.type);
-        // Cache control for performance, but private
-        headers.set("Cache-Control", "private, max-age=3600");
+        const safeType = ALLOWED_UPLOAD_CONTENT_TYPES.find(type => type === file.type);
+        const headers = new Headers();
+        headers.set("Content-Disposition", `${safeType ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`);
+        headers.set("Content-Type", safeType || "application/octet-stream");
+        headers.set("Cache-Control", "private, no-store");
+        headers.set("Vary", "Cookie");
+        headers.set("X-Content-Type-Options", "nosniff");
 
         return new NextResponse(response.body, {
             status: 200,

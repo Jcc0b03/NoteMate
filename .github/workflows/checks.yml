@@ -1,0 +1,43 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: notemate
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: notemate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U notemate -d notemate_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://notemate:ci-test-only@127.0.0.1:5432/notemate_test
+      TEST_DATABASE_URL: postgresql://notemate:ci-test-only@127.0.0.1:5432/notemate_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run lint -- --max-warnings=0
+      - run: npx tsc --noEmit --incremental false
+      - run: npm test
+      - run: npm run test:integration

@@ -9,7 +9,7 @@ export default function PrivacyPage() {
     return (
         <LegalPageLayout title="Polityka Prywatności" updatedAt="16 czerwca 2026">
             <p>
-                Niniejsza Polityka Prywatności opisuje, w jaki sposób aplikacja <strong>NoteMate</strong> („Aplikacja", „my")
+                Niniejsza Polityka Prywatności opisuje, w jaki sposób aplikacja <strong>NoteMate</strong> („Aplikacja”, „my”)
                 zbiera, wykorzystuje i chroni dane osobowe użytkowników. NoteMate to projekt edukacyjny (studencki), a poniższy
                 dokument ma charakter przykładowy.
             </p>

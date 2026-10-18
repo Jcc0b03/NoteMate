@@ -1,12 +1,11 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, X, FileText, Image as ImageIcon, Smartphone, Trash2, Check, AlertCircle } from "lucide-react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useDropzone } from "react-dropzone";
-import { MobileHandoffButton } from "@/components/MobileHandoffButton";
+import { MobileHandoffButton, type HandoffFile } from "@/components/MobileHandoffButton";
 
 export type FileUploadStatus = 'uploading' | 'complete' | 'error';
 
@@ -31,13 +30,13 @@ interface NoteFileUploadProps {
 }
 
 export function NoteFileUpload({ files, setFiles }: NoteFileUploadProps) {
-    const handleMobileUpload = (blobs: any[]) => {
+    const handleMobileUpload = (blobs: HandoffFile[]) => {
         const newFiles: FileUpload[] = blobs.map(blob => ({
             id: Math.random().toString(36).substring(7),
             file: {
-                name: blob.pathname.split('/').pop() || 'mobile-upload.jpg',
+                name: blob.name,
                 size: blob.size,
-                type: 'image/jpeg'
+                type: blob.type
             },
             progress: 100,
             status: 'complete',
