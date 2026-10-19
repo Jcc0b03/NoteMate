@@ -184,6 +184,7 @@ function MobileUploadContent() {
         // Create a copy to iterate, but we update state by finding by ID
         // We only process 'pending' or 'error' files (retries)
         const queue = stagedFiles.filter(f => f.status === 'pending' || f.status === 'error');
+        let uploadFailed = false;
 
         // Sequential Upload Strategy
         for (const item of queue) {
@@ -209,6 +210,7 @@ function MobileUploadContent() {
                 setStagedFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'success' } : f));
 
             } catch (error) {
+                uploadFailed = true;
                 console.error(`Error uploading ${item.id}`, error);
                 setStagedFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error' } : f));
                 // Optional: Stop on error? Or continue?
@@ -218,12 +220,8 @@ function MobileUploadContent() {
 
         setIsUploading(false);
 
-        // Signal completion if all finished successfully
-        // We re-calculate based on current state (or assume based on logic)
-        // Since we are inside the function, we can't easily see the updated state immediately due to closure,
-        // but we can check if we had any errors in our loop.
-        // Actually, let's just fire 'complete' if we had at least 1 success and no major crashes.
-        // The PC will close when it sees this.
+        // Keep the desktop session open when a file needs to be retried.
+        if (uploadFailed) return;
         await fetch(`/api/handoff/complete?sessionId=${sessionId}`, {
             method: "POST",
             headers: new Headers({ "ngrok-skip-browser-warning": "69420" })

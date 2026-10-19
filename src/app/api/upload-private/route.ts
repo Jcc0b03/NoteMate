@@ -1,50 +1,18 @@
-import { put } from '@vercel/blob';
-import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
-import { getUploadValidationError, sanitizeUploadFilename } from '@/lib/upload-validation';
+import { currentUser } from "@clerk/nextjs/server";
+import { uploadPrivateFile } from "@/lib/file-storage";
+import { HttpError } from "@/lib/http-error";
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request) {
     const user = await currentUser();
-
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const formData = await request.formData();
-    const fileEntry = formData.get('file');
-
-    if (!(fileEntry instanceof File)) {
-        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    const validationError = getUploadValidationError(fileEntry);
-
-    if (validationError) {
-        return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-
-    const requestedFilename = formData.get('filename');
-    const filename = sanitizeUploadFilename(typeof requestedFilename === 'string' ? requestedFilename : fileEntry.name);
-
-    // Generate random suffix
-    const randomSuffix = Math.random().toString(36).substring(2, 6);
-    const lastDotIndex = filename.lastIndexOf('.');
-    const name = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
-    const ext = lastDotIndex !== -1 ? filename.substring(lastDotIndex) : '';
-    const finalFilename = `${name}_${randomSuffix}${ext}`;
-
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     try {
-        const blob = await put(finalFilename, fileEntry, {
-            access: 'public',
-            token: process.env.BLOB_READ_WRITE_TOKEN,
-        });
-
-        return NextResponse.json(blob);
+        const form = await request.formData();
+        const file = form.get("file");
+        if (!(file instanceof File)) throw new HttpError(400, "No file provided");
+        const upload = await uploadPrivateFile(file, user.id);
+        return Response.json({ url: upload.url, pathname: upload.pathname, size: upload.size, name: upload.name, type: upload.type });
     } catch (error) {
-        console.error("Upload error:", error);
-        return NextResponse.json(
-            { error: (error as Error).message },
-            { status: 500 },
-        );
+        return Response.json({ error: error instanceof HttpError ? error.message : "Upload failed" },
+            { status: error instanceof HttpError ? error.status : 500 });
     }
 }

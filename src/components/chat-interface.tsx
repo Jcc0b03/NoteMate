@@ -2,18 +2,18 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { Send, Bot, User, Paperclip } from "lucide-react";
+import { Send, Bot, User } from "lucide-react";
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// ... imports ...
+import type { Message, NoteFile } from "../../generated/prisma/client";
 
 interface ChatInterfaceProps {
     note: {
         id: string;
         title: string | null;
-        files: any[];
+        files: Pick<NoteFile, 'id' | 'url' | 'name'>[];
     };
     readOnly?: boolean;
 }
@@ -34,12 +34,11 @@ export function ChatInterface({ note, readOnly = false }: ChatInterfaceProps) {
     useEffect(() => {
         fetch(`/api/ai/chat?noteId=${note.id}`)
             .then(res => res.json())
-            .then((data) => {
+            .then((data: Pick<Message, 'id' | 'role' | 'content'>[]) => {
                 if (Array.isArray(data) && data.length > 0) {
-                    setMessages(data.map((m: any) => ({
+                    setMessages(data.map(m => ({
                         id: m.id,
                         role: m.role,
-                        content: m.content,
                         parts: [{ type: 'text', text: m.content }]
                     })));
                 }
@@ -103,28 +102,19 @@ export function ChatInterface({ note, readOnly = false }: ChatInterfaceProps) {
                             : 'bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-tl-none'
                             }`}>
                             <div className={`prose max-w-none text-sm leading-relaxed prose-p:my-1 prose-pre:bg-zinc-100 dark:prose-pre:bg-zinc-800 prose-pre:border dark:prose-pre:border-zinc-700 ${m.role === 'user' ? 'prose-invert' : 'dark:prose-invert'}`}>
-                                {m.parts
-                                    ? m.parts.map((part, i) => {
-                                        if (part.type === 'text') {
-                                            return (
-                                                <ReactMarkdown
-                                                    key={i}
-                                                    remarkPlugins={[remarkGfm]}
-                                                >
-                                                    {part.text}
-                                                </ReactMarkdown>
-                                            );
-                                        }
-                                        return null;
-                                    })
-                                    : (
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                        >
-                                            {(m as any).content}
-                                        </ReactMarkdown>
-                                    )
-                                }
+                                {m.parts.map((part, i) => {
+                                    if (part.type === 'text') {
+                                        return (
+                                            <ReactMarkdown
+                                                key={i}
+                                                remarkPlugins={[remarkGfm]}
+                                            >
+                                                {part.text}
+                                            </ReactMarkdown>
+                                        );
+                                    }
+                                    return null;
+                                })}
                             </div>
                         </div>
 

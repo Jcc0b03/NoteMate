@@ -67,6 +67,43 @@ model NoteFile {
   size      Int      // File size in bytes
   sourceName String?  // Oryginalna nazwa pliku
   createdAt DateTime @default(now())
+  aiFileName String?
+  aiFileUri String?
+  aiFileMimeType String?
+  aiFileExpiresAt DateTime?
+  aiFileLeaseUntil DateTime?
+
+  @@index([url])
+}
+
+model Upload {
+  id String @id @default(cuid())
+  userId String
+  url String @unique
+  pathname String
+  name String
+  type String
+  size Int
+  createdAt DateTime @default(now())
+  claimedAt DateTime?
+  handoffId String?
+  handoff HandoffSession? @relation(fields: [handoffId], references: [id], onDelete: SetNull)
+
+  @@index([userId, claimedAt])
+  @@index([handoffId])
+}
+
+model HandoffSession {
+  id String @id @default(uuid())
+  userId String
+  expiresAt DateTime
+  completedAt DateTime?
+  uploads Upload[]
+}
+
+model BlobDeletion {
+  url String @id
+  createdAt DateTime @default(now())
 }
 
 model Message {

@@ -9,7 +9,7 @@ export default function TermsPage() {
     return (
         <LegalPageLayout title="Regulamin" updatedAt="16 czerwca 2026">
             <p>
-                Niniejszy Regulamin określa zasady korzystania z aplikacji <strong>NoteMate</strong> („Aplikacja"). Korzystając
+                Niniejszy Regulamin określa zasady korzystania z aplikacji <strong>NoteMate</strong> („Aplikacja”). Korzystając
                 z Aplikacji, akceptujesz poniższe warunki. NoteMate to projekt edukacyjny (studencki), a regulamin ma charakter
                 przykładowy.
             </p>
@@ -48,7 +48,7 @@ export default function TermsPage() {
             <p>
                 Wyniki działania Asystenta AI (transkrypcje, podsumowania, odpowiedzi) mogą zawierać błędy lub nieścisłości i nie
                 stanowią porady eksperckiej. Zawsze weryfikuj istotne informacje we własnym zakresie. Aplikacja udostępniana jest
-                „tak jak jest", bez gwarancji nieprzerwanego i bezbłędnego działania. W maksymalnym zakresie dozwolonym przez
+                „tak jak jest”, bez gwarancji nieprzerwanego i bezbłędnego działania. W maksymalnym zakresie dozwolonym przez
                 prawo nie ponosimy odpowiedzialności za szkody wynikające z korzystania z Aplikacji.
             </p>
 

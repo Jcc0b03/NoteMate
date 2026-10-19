@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
-import { MobileHandoffButton } from "@/components/MobileHandoffButton";
+import { MobileHandoffButton, type HandoffFile } from "@/components/MobileHandoffButton";
 
 const frameworks = [
     {
@@ -87,13 +87,13 @@ export default function NewNotePage() {
         setTags(tags.filter(tag => tag !== tagToRemove));
     };
 
-    const handleMobileUpload = (blobs: any[]) => {
+    const handleMobileUpload = (blobs: HandoffFile[]) => {
         const newFiles: FileUpload[] = blobs.map(blob => ({
             id: Math.random().toString(36).substring(7),
             file: {
-                name: blob.pathname.split('/').pop() || 'mobile-upload.jpg',
+                name: blob.name,
                 size: blob.size,
-                type: 'image/jpeg' // Default assumption or infer from ext
+                type: blob.type
             },
             progress: 100,
             status: 'complete',
@@ -294,7 +294,7 @@ export default function NewNotePage() {
                                                         onClick={handleCreateSubject}
                                                     >
                                                         <Plus className="h-4 w-4" />
-                                                        Dodaj "{inputValue}"
+                                                        Dodaj &quot;{inputValue}&quot;
                                                     </Button>
                                                 </CommandEmpty>
                                                 <CommandGroup>

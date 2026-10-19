@@ -35,7 +35,7 @@ Projekt powstał jako aplikacja zespołowa na studia. Głównym celem systemu je
 | Autoryzacja | Clerk |
 | Baza danych | PostgreSQL |
 | ORM | Prisma 7 |
-| Storage plików | Vercel Blob |
+| Storage plików | Prywatny Vercel Blob Store |
 | AI | Google Gemini przez Vercel AI SDK oraz `@google/generative-ai` |
 | QR | `react-qr-code` |
 | Deployment | Vercel |
@@ -171,13 +171,14 @@ Role wiadomości czatu:
 
 | Endpoint | Metoda | Opis |
 | --- | --- | --- |
-| `/api/upload` | `POST`, `DELETE` | Upload plików przez klienta Vercel Blob i usuwanie blobów. |
-| `/api/upload-private` | `POST` | Serwerowy upload pliku do Vercel Blob. |
+| `/api/upload` | `DELETE` | Usuwanie własnego, niewykorzystanego uploadu. |
+| `/api/upload-private` | `POST` | Prywatny upload i rejestracja właściciela pliku. |
 | `/api/file` | `GET` | Bezpieczne pobieranie pliku przypisanego do notatki. |
 | `/api/ai/process` | `POST` | Ręczne uruchomienie przetwarzania notatki przez AI. |
 | `/api/ai/chat` | `GET`, `POST` | Pobieranie historii i streaming odpowiedzi asystenta AI. |
 | `/api/ai/flashcards` | `GET`, `POST` | Pobieranie zapisanych zestawów i generowanie nowych fiszek. |
-| `/api/handoff/upload` | `POST` | Upload pliku z telefonu w sesji mobile handoff. |
+| `/api/handoff/session` | `POST` | Utworzenie sesji QR ważnej 15 minut przez zalogowanego właściciela. |
+| `/api/handoff/upload` | `POST` | Prywatny upload z telefonu z ważnym tokenem sesji QR. |
 | `/api/handoff/poll` | `GET` | Sprawdzanie, czy telefon wysłał pliki. |
 | `/api/handoff/complete` | `POST` | Oznaczenie sesji uploadu z telefonu jako zakończonej. |
 
@@ -260,12 +261,16 @@ http://localhost:3000
 | `npm run build` | Generuje klienta Prisma i buduje aplikację produkcyjną. |
 | `npm run start` | Uruchamia zbudowaną aplikację. |
 | `npm run lint` | Uruchamia ESLint. |
+| `npm test` | Uruchamia testy jednostkowe i regresyjne. |
+| `npm run test:integration` | Uruchamia testy z PostgreSQL wskazanym przez `TEST_DATABASE_URL`. |
+| `npm run migrate:public-files` | Pokazuje plan migracji starych publicznych plików; zapis wymaga `-- --apply`. |
+| `npm run cleanup:files` | Pokazuje kolejkę usuwania osieroconych blobów; ponowienie wymaga `-- --apply`. |
 
 ## Deployment na Vercel
 
 1. Utwórz projekt w Vercel i podepnij repozytorium.
 2. Dodaj bazę PostgreSQL albo zewnętrzny connection string.
-3. Dodaj Vercel Blob i skopiuj `BLOB_READ_WRITE_TOKEN`.
+3. Dodaj **prywatny** Vercel Blob Store i skopiuj `BLOB_READ_WRITE_TOKEN`.
 4. Dodaj wszystkie zmienne środowiskowe z sekcji `.env`.
 5. Upewnij się, że `DATABASE_URL` wskazuje na bazę produkcyjną.
 6. Uruchom migracje produkcyjne:
@@ -283,6 +288,10 @@ npm run build
 ```
 
 ## Bezpieczeństwo
+
+Nowe pliki i klony są prywatne. Wcześniej opublikowane obiekty wymagają osobnej migracji do prywatnego magazynu i usunięcia publicznych źródeł. Zasady własności, cache AI, sesje QR, kolejkę sprzątania i procedurę migracji opisuje [dokumentacja cyklu życia plików](docs/security-file-lifecycle.md).
+
+Workflow `.github/workflows/checks.yml` uruchamia lint, kontrolę typów, testy jednostkowe oraz integracyjne z osobnym PostgreSQL. Usługi Clerk, Blob i Google są w testach symulowane; testy nie wymagają produkcyjnych poświadczeń.
 
 - Plik `.env.local` jest ignorowany przez Git i nie powinien trafić do publicznego repozytorium.
 - Sekrety należy przechowywać w panelu Vercel jako Environment Variables.
